@@ -1,0 +1,50 @@
+{
+  "_comment": "Example OpenClaw daemon configuration for AuraTrade. Copy to ~/.openclaw/openclaw.json",
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "google/gemini-2.5-flash"
+      },
+      "workspace": "~/.openclaw/workspace"
+    }
+  },
+  "plugins": {
+    "enabled": true,
+    "allow": ["armorclaw"],
+    "entries": {
+      "armorclaw": {
+        "enabled": true,
+        "config": {
+          "enabled": true,
+          "policyUpdateEnabled": true,
+          "userId": "auratrade-user",
+          "agentId": "auratrade-agent-001",
+          "contextId": "auratrade-paper-trading",
+          "policyStorePath": "~/.openclaw/armoriq.policy.json",
+          "iapEndpoint": "https://customer-iap.armoriq.ai",
+          "proxyEndpoint": "https://customer-proxy.armoriq.ai",
+          "backendEndpoint": "https://customer-api.armoriq.ai"
+        }
+      }
+    }
+  },
+  "auth": {
+    "profiles": {
+      "google:default": {
+        "provider": "google",
+        "mode": "api_key"
+      }
+    },
+    "order": {
+      "google": ["google:default"]
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "bind": "loopback"
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto"
+  }
+}

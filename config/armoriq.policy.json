@@ -1,0 +1,148 @@
+{
+  "version": "1.0",
+  "agent_id": "auratrade-agent-001",
+  "context_id": "auratrade-paper-trading",
+  "intent_file": "../intent.json",
+  "description": "AuraTrade intent enforcement policy — paper trading demo",
+  "policies": [
+    {
+      "id": "ticker-universe-restriction",
+      "description": "Only allow trades in the authorized ticker universe",
+      "type": "tool_restriction",
+      "tool": "alpaca:place_order",
+      "condition": "args.symbol NOT IN ['NVDA','AAPL','GOOGL','MSFT']",
+      "action": "block",
+      "severity": "critical",
+      "message": "Ticker {args.symbol} not in authorized universe [NVDA, AAPL, GOOGL, MSFT]"
+    },
+    {
+      "id": "trade-size-limits",
+      "description": "Block single orders exceeding max_order_usd from intent.json",
+      "type": "value_constraint",
+      "tool": "alpaca:place_order",
+      "condition": "args.notional > 5000",
+      "action": "block",
+      "severity": "critical",
+      "message": "Order ${args.notional} exceeds max_order_usd limit of $5,000"
+    },
+    {
+      "id": "daily-spend-limit",
+      "description": "Block trades that would exceed the daily spending cap",
+      "type": "aggregate_constraint",
+      "tool": "alpaca:place_order",
+      "condition": "daily_notional_spent + args.notional > 20000",
+      "action": "block",
+      "severity": "high",
+      "message": "Daily spend limit of $20,000 would be exceeded"
+    },
+    {
+      "id": "portfolio-concentration-limit",
+      "description": "Block trades that would make a single ticker more than 40% of portfolio",
+      "type": "portfolio_constraint",
+      "tool": "alpaca:place_order",
+      "condition": "(position_value(args.symbol) + args.notional) / total_portfolio_value > 0.40",
+      "action": "block",
+      "severity": "high",
+      "message": "Post-trade concentration for {args.symbol} would exceed 40% limit"
+    },
+    {
+      "id": "sector-exposure-limit",
+      "description": "Block trades that would push technology sector above 60% of portfolio",
+      "type": "portfolio_constraint",
+      "tool": "alpaca:place_order",
+      "condition": "sector_weight('technology') + args.notional / total_portfolio_value > 0.60",
+      "action": "block",
+      "severity": "high",
+      "message": "Tech sector exposure would exceed 60% limit"
+    },
+    {
+      "id": "market-hours-only",
+      "description": "Restrict trading to NYSE market hours only",
+      "type": "time_restriction",
+      "tool": "alpaca:place_order",
+      "schedule": "09:30-16:00 America/New_York Mon-Fri",
+      "action": "block",
+      "severity": "critical",
+      "message": "Trading only permitted 09:30–16:00 ET Mon–Fri"
+    },
+    {
+      "id": "earnings-blackout-window",
+      "description": "Block trades within 2 days before or 1 day after earnings",
+      "type": "calendar_restriction",
+      "tool": "alpaca:place_order",
+      "condition": "days_to_earnings(args.symbol) < 2 OR days_since_earnings(args.symbol) < 1",
+      "action": "block",
+      "severity": "high",
+      "message": "Trade blocked: earnings blackout window active for {args.symbol}"
+    },
+    {
+      "id": "wash-sale-prevention",
+      "description": "Block buy orders if the same ticker was sold at a loss within 30 days",
+      "type": "trade_history_constraint",
+      "tool": "alpaca:place_order",
+      "condition": "args.side == 'buy' AND days_since_loss_sell(args.symbol) < 30",
+      "action": "block",
+      "severity": "medium",
+      "message": "Wash-sale prevention: {args.symbol} sold at loss within last 30 days"
+    },
+    {
+      "id": "tool-restrictions",
+      "description": "Enforce strict role-based tool access control for each agent",
+      "type": "agent_rbac",
+      "bindings": {
+        "AnalystAgent": ["market-data", "research"],
+        "RiskAgent": ["alpaca:get_positions", "alpaca:get_account", "calculate_exposure"],
+        "TraderAgent": ["alpaca:execute"]
+      },
+      "action": "block",
+      "severity": "critical",
+      "message": "{agent} is not authorized to call {tool}"
+    },
+    {
+      "id": "delegation-scope-enforcement",
+      "description": "Ensure trade details match the delegation token issued by Risk Agent",
+      "type": "token_constraint",
+      "condition": "args.ticker != token.ticker OR args.side != token.action OR args.notional > token.max_amount_usd",
+      "action": "block",
+      "severity": "critical",
+      "message": "Order fields do not match delegation token scope"
+    },
+    {
+      "id": "agent-role-binding",
+      "description": "Only TraderAgent may submit orders to execution",
+      "type": "identity_check",
+      "condition": "submitting_agent != 'TraderAgent'",
+      "action": "block",
+      "severity": "critical",
+      "message": "Only TraderAgent may submit orders. Received from: {submitting_agent}"
+    },
+    {
+      "id": "intent-token-binding",
+      "description": "Verify intent.json has not been tampered with since system startup",
+      "type": "integrity_check",
+      "condition": "request.intent_token_id != system.loaded_intent_hash",
+      "action": "block",
+      "severity": "critical",
+      "message": "intent_token_id mismatch — possible intent.json tampering detected"
+    },
+    {
+      "id": "risk-agent-read-only",
+      "description": "Risk Agent must never call any write or execute tools",
+      "type": "agent_tool_denylist",
+      "agent": "RiskAgent",
+      "forbidden_tools": ["alpaca:execute", "alpaca:place_order", "alpaca:cancel_order", "alpaca:close_position"],
+      "action": "block",
+      "severity": "critical",
+      "message": "RiskAgent attempted to call write tool '{tool}' — read-only constraint violated"
+    },
+    {
+      "id": "data-class-protection",
+      "description": "Prevent access to restricted or confidential data by unauthorized agents",
+      "type": "data_classification",
+      "forbidden_classes": ["RESTRICTED", "CONFIDENTIAL", "PII", "CREDENTIALS"],
+      "action": "block",
+      "severity": "high",
+      "message": "Data class {data_class} not accessible to agent {agent}"
+    }
+  ]
+}

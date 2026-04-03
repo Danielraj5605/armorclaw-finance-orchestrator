@@ -1,6 +1,11 @@
 """
 backend/main.py
 FastAPI application entry point.
+
+Modes:
+  OPENCLAW_MODE=demo  (default) — simulated pipeline, no real OpenClaw daemon required
+  OPENCLAW_MODE=live            — connects to real OpenClaw daemon at ws://127.0.0.1:18789
+                                  Requires: openclaw onboard + @armoriq/armorclaw installed
 """
 import json
 import os
@@ -19,11 +24,14 @@ from dotenv import load_dotenv
 # ── Load environment ────────────────────────────────────────────
 load_dotenv()
 
+OPENCLAW_MODE = os.getenv("OPENCLAW_MODE", "demo").lower()
+
 # ── Local imports ───────────────────────────────────────────────
 from backend.db.database import init_db, get_db, AuditLog
 from backend.armorclaw.engine import ArmorClawEngine
 from backend.alpaca.client import AlpacaClient
 from backend.agents.orchestrator import run_pipeline
+from backend.openclaw_bridge import run_live_pipeline
 
 # ── Load intent.json ────────────────────────────────────────────
 INTENT_PATH = os.getenv("INTENT_FILE_PATH", "./intent.json")
@@ -47,6 +55,12 @@ async def lifespan(app: FastAPI):
     init_db()
     print("✅ SQLite audit log ready")
     print("✅ ArmorClaw engine initialized — 14 policy rules active")
+    if OPENCLAW_MODE == "live":
+        print(f"🦞 OpenClaw mode: LIVE — connecting to ws://127.0.0.1:18789")
+        print("   Make sure: openclaw doctor shows armorclaw plugin enabled")
+    else:
+        print("🦞 OpenClaw mode: DEMO — using simulated pipeline (no daemon required)")
+        print("   Set OPENCLAW_MODE=live to use the real OpenClaw daemon")
     yield
 
 
@@ -87,25 +101,41 @@ async def run_trade(req: TradeRequest):
 
     run_id = str(uuid.uuid4())
 
-    # Fire pipeline in background
-    asyncio.create_task(
-        run_pipeline(
-            run_id=run_id,
-            action=req.action,
-            ticker=req.ticker,
-            amount_usd=req.amount_usd,
-            intent=INTENT,
-            armorclaw=ARMORCLAW,
-            alpaca_client=ALPACA,
-            event_queues=EVENT_QUEUES,
+    if OPENCLAW_MODE == "live":
+        # LIVE MODE: route command to real OpenClaw daemon
+        # ArmorClaw plugin handles enforcement inside the daemon
+        asyncio.create_task(
+            run_live_pipeline(
+                run_id=run_id,
+                action=req.action,
+                ticker=req.ticker,
+                amount_usd=req.amount_usd,
+                event_queues=EVENT_QUEUES,
+            )
         )
-    )
+        pipeline_mode = "openclaw-live"
+    else:
+        # DEMO MODE: simulated pipeline with our own Python ArmorClaw enforcement
+        asyncio.create_task(
+            run_pipeline(
+                run_id=run_id,
+                action=req.action,
+                ticker=req.ticker,
+                amount_usd=req.amount_usd,
+                intent=INTENT,
+                armorclaw=ARMORCLAW,
+                alpaca_client=ALPACA,
+                event_queues=EVENT_QUEUES,
+            )
+        )
+        pipeline_mode = "demo-simulation"
 
     return {
-        "run_id":  run_id,
-        "status":  "pipeline_started",
-        "message": "Agent pipeline initiated. Connect to SSE stream for live updates.",
-        "sse_url": f"/run-trade/stream/{run_id}",
+        "run_id":       run_id,
+        "status":       "pipeline_started",
+        "pipeline_mode": pipeline_mode,
+        "message":      "Agent pipeline initiated. Connect to SSE stream for live updates.",
+        "sse_url":      f"/run-trade/stream/{run_id}",
     }
 
 
@@ -211,4 +241,12 @@ def get_positions():
 # ── Health check ─────────────────────────────────────────────────
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "AuraTrade API", "version": "1.0.0"}
+    return {
+        "status":         "ok",
+        "service":        "AuraTrade API",
+        "version":        "2.0.0",
+        "openclaw_mode":  OPENCLAW_MODE,
+        "openclaw_ws":    os.getenv("OPENCLAW_WS", "ws://127.0.0.1:18789") if OPENCLAW_MODE == "live" else "n/a",
+        "intent_loaded":  bool(INTENT),
+        "armorclaw":      "active",
+    }
