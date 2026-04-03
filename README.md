@@ -70,7 +70,7 @@ In demo mode the agent pipeline is simulated with realistic delays and outputs. 
 
 ---
 
-### Full OpenClaw Integration (WSL2 / Linux / macOS)
+### Full OpenClaw Integration (Git Bash or WSL on Windows — not PowerShell)
 
 **Step 1 — Get free API keys**
 
@@ -83,14 +83,15 @@ In demo mode the agent pipeline is simulated with realistic delays and outputs. 
 **Step 2 — Install OpenClaw + ArmorClaw**
 
 ```bash
-# In WSL2 or Git Bash:
-curl -fsSL https://armoriq.ai/install-armorclaw.sh | bash \
+# In Git Bash or WSL (WSL2 not strictly required)
+# Flags MUST come after bash -s --, not directly after bash
+curl -fsSL https://armoriq.ai/install-armorclaw.sh | bash -s -- \
   --gemini-key YOUR_GEMINI_KEY \
   --api-key YOUR_ARMORIQ_KEY \
   --no-prompt
 ```
 
-This clones `openclaw/openclaw`, builds it, installs the `@armoriq/armorclaw` plugin, and configures everything automatically.
+This runs 7 stages: clones `openclaw/openclaw` into `~/openclaw-armoriq/`, applies 8 security patches, installs the `@armoriq/armorclaw` plugin, and configures everything automatically.
 
 **Step 3 — Install Alpaca Trading Skill**
 
@@ -118,21 +119,29 @@ cp config/armoriq.policy.json ~/.openclaw/armoriq.policy.json
 **Step 6 — Start everything**
 
 ```bash
-# Terminal 1: OpenClaw daemon
-openclaw onboard --install-daemon
+# Terminal 1: Start the OpenClaw gateway
+# OpenClaw lives at ~/openclaw-armoriq/ — global CLI may not be in PATH
+cd ~/openclaw-armoriq
+pnpm dev gateway
+# Confirmed working when you see all three:
+#   "listening on ws://127.0.0.1:18789"
+#   "IAP Verification Service initialized"
+#   "CSRG proof headers are REQUIRED"
+# → Also check platform.armoriq.ai — executions appear there in real time
 
 # Terminal 2: FastAPI backend
-uvicorn backend.main:app --host 0.0.0.0 --port 8000
+cd /path/to/armorclaw-finance-orchestrator
+OPENCLAW_MODE=live uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
 # Terminal 3: React frontend
 cd website && npm run dev
 ```
 
-**Step 7 — Verify**
+**Step 7 — Verify (if `openclaw` CLI is in PATH)**
 
 ```bash
-openclaw doctor         # Should show ✅ armorclaw plugin enabled
-openclaw plugins list   # Should show @armoriq/armorclaw (active)
+openclaw doctor         # ✅ armorclaw plugin enabled
+openclaw plugins list   # @armoriq/armorclaw (active)
 ```
 
 ---

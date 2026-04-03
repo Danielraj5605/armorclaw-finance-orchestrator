@@ -375,16 +375,19 @@ OpenClaw Daemon (Node.js)   ← Real OpenClaw runtime
 
 **Step 2: Run the ArmorIQ installer**
 ```bash
-curl -fsSL https://armoriq.ai/install-armorclaw.sh | bash \
+# In Git Bash or WSL (not PowerShell/CMD) — WSL2 not strictly required
+curl -fsSL https://armoriq.ai/install-armorclaw.sh | bash -s -- \
   --gemini-key YOUR_GEMINI_API_KEY \
   --api-key YOUR_ARMORIQ_API_KEY \
   --no-prompt
 ```
-This automatically:
-- Clones `openclaw/openclaw` from GitHub
-- Builds it with pnpm
+> **Note:** Flags must be passed after `bash -s --`, not directly after `bash`.
+
+This runs 7 stages automatically:
+- Clones `openclaw/openclaw` from GitHub into `~/openclaw-armoriq/`
+- Applies 8 ArmorClaw security patches to the OpenClaw runtime
 - Installs `@armoriq/armorclaw` npm plugin
-- Writes `~/.openclaw/openclaw.json` config
+- Configures Gemini and ArmorIQ keys in `~/.openclaw/openclaw.json`
 
 **Step 3: Install the Alpaca Trading Skill**
 ```bash
@@ -395,18 +398,25 @@ export APCA_API_SECRET_KEY="your_paper_secret"
 export APCA_API_BASE_URL="https://paper-api.alpaca.markets"
 ```
 
-**Step 4: Start the OpenClaw daemon**
+**Step 4: Start the OpenClaw gateway**
 ```bash
-openclaw onboard --install-daemon
-# Daemon now runs on ws://127.0.0.1:18789
+# OpenClaw installs to ~/openclaw-armoriq/
+# The global `openclaw` CLI may not be in PATH — use pnpm directly
+cd ~/openclaw-armoriq
+pnpm dev gateway
+# Wait for these three lines:
+# ✅ "listening on ws://127.0.0.1:18789"
+# ✅ "IAP Verification Service initialized"
+# ✅ "CSRG proof headers are REQUIRED"
+# System is confirmed working when executions appear at platform.armoriq.ai
 ```
 
 **Step 5: Verify ArmorClaw is active**
 ```bash
+# If openclaw CLI is in PATH:
 openclaw doctor
-# Should show: ✅ armorclaw plugin enabled
 openclaw plugins list
-# Should show: @armoriq/armorclaw (active)
+# Expected: @armoriq/armorclaw (active)
 ```
 
 ### 9.3 Policy Configuration
@@ -719,37 +729,42 @@ npm run dev
 # 5. Open http://localhost:5173
 ```
 
-### Full OpenClaw Integration (WSL2 / Linux / macOS)
+### Full OpenClaw Integration (Git Bash or WSL on Windows — not PowerShell)
 
 ```bash
-# Step 1: Install OpenClaw + ArmorClaw (requires WSL2 on Windows)
-curl -fsSL https://armoriq.ai/install-armorclaw.sh | bash \
+# Step 1 — Install OpenClaw + ArmorClaw
+# Flags MUST come after bash -s --, not directly after bash
+curl -fsSL https://armoriq.ai/install-armorclaw.sh | bash -s -- \
   --gemini-key YOUR_GEMINI_KEY \
   --api-key YOUR_ARMORIQ_KEY \
   --no-prompt
 
-# Step 2: Install Alpaca skill
+# Step 2 — Install Alpaca skill
 clawhub install lacymorrow/alpaca-trading-skill
 
-# Step 3: Configure Alpaca keys in ~/.env or skill config
+# Step 3 — Configure Alpaca keys
 echo "APCA_API_KEY_ID=your_paper_key" >> ~/.openclaw/.env
 echo "APCA_API_SECRET_KEY=your_paper_secret" >> ~/.openclaw/.env
 echo "APCA_API_BASE_URL=https://paper-api.alpaca.markets" >> ~/.openclaw/.env
 
-# Step 4: Copy our policy to OpenClaw config dir
+# Step 4 — Copy our policy to OpenClaw config dir
 cp config/armoriq.policy.json ~/.openclaw/armoriq.policy.json
 
-# Step 5: Start OpenClaw daemon
-openclaw onboard --install-daemon
+# Step 5 — Start the OpenClaw gateway
+# OpenClaw installs to ~/openclaw-armoriq/ — global CLI may not be in PATH
+cd ~/openclaw-armoriq
+pnpm dev gateway
+# Confirmed working when you see:
+#   "listening on ws://127.0.0.1:18789"
+#   "IAP Verification Service initialized"
+#   "CSRG proof headers are REQUIRED"
+# And executions appear at platform.armoriq.ai in real time
 
-# Step 6: Verify setup
-openclaw doctor
-openclaw plugins list
-
-# Step 7: Start FastAPI with OpenClaw bridge enabled
+# Step 6 — Start FastAPI with OpenClaw bridge enabled (new terminal)
+cd /path/to/armorclaw-finance-orchestrator
 OPENCLAW_MODE=live uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
-# Step 8: Start frontend
+# Step 7 — Start frontend (new terminal)
 cd website && npm run dev
 ```
 
@@ -956,7 +971,7 @@ def get_llm():
 | OpenClaw GitHub | https://github.com/openclaw/openclaw |
 | OpenClaw Docs | https://docs.openclaw.ai |
 | ArmorIQ Platform | https://platform.armoriq.ai |
-| ArmorClaw Install | `curl -fsSL https://armoriq.ai/install-armorclaw.sh \| bash` |
+| ArmorClaw Install | `curl -fsSL https://armoriq.ai/install-armorclaw.sh \| bash -s -- --no-prompt` |
 | ClawHub Registry | https://clawhub.io |
 | Alpaca Paper Trading | https://app.alpaca.markets |
 | Alpaca MCP Server | https://github.com/alpacahq/alpaca-mcp-server |
