@@ -786,9 +786,12 @@ App.jsx                          ← Root component; manages global state and la
 | **LangGraph** | Framework for building AI agent pipelines | Powers the Analyst, Risk, and Trader agents |
 | **OpenClaw / ArmorClaw SDK** | Safety enforcement library | The 5-check engine that gates all trades |
 | **FastAPI** | Python web framework | Serves the 3 API endpoints |
+| **Gemini 2.5 Flash** | LLM powering the agents (free tier) | The intelligence layer for all three agents |
 | **Alpaca Paper Trading** | Free fake-money trading API | Executes simulated trades (no real money) |
 | **Node.js + npm** | JavaScript runtime | Runs the React/Vite frontend |
 | **React + Vite** | Frontend framework | The UI dashboard |
+
+> **Multi-LLM Support:** The system uses LangChain's provider abstraction, so you can swap the LLM by changing two lines of code and one `.env` variable. See the [Multi-LLM Support](#multi-llm-support) section for all supported providers.
 
 ---
 
@@ -833,17 +836,25 @@ git --version
 
 ---
 
-### Step 3 — Get an OpenAI API Key (for LLM-powered agents)
+### Step 3 — Get a Google Gemini API Key (Free Tier)
+
+AuraTrade defaults to **Gemini 2.5 Flash** — which has a generous **free tier** via Google AI Studio. No credit card required.
 
 ```
-1. Go to: https://platform.openai.com/
-2. Sign up / log in
-3. Go to: https://platform.openai.com/api-keys
-4. Click "Create new secret key" → give it a name → copy it
-5. Add a small amount of credit ($5–$10) at:
-   https://platform.openai.com/account/billing
-   (GPT-4o is very cost-efficient; $5 covers hundreds of test runs)
+1. Go to: https://aistudio.google.com/
+2. Sign in with your Google account
+3. Click "Get API key" in the top-left sidebar
+4. Click "Create API key in new project"
+5. Copy your GEMINI_API_KEY (looks like: AIzaSy...)
+
+Free tier limits (as of 2025):
+  - 15 requests per minute
+  - 1,500 requests per day
+  - 1 million tokens per minute
+  → More than enough for AuraTrade development and testing
 ```
+
+> **Want to use a different LLM?** See the [Multi-LLM Support](#multi-llm-support) section — you can use OpenAI, Anthropic Claude, Groq, Mistral, or any other LangChain-supported provider by changing two lines and one `.env` key.
 
 ---
 
@@ -881,13 +892,16 @@ fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 langgraph>=0.1.0
 langchain>=0.1.0
-langchain-openai>=0.0.5
+langchain-google-genai>=1.0.0     # Gemini 2.5 Flash (default)
+langchain-openai>=0.0.5            # Optional: if switching to OpenAI
+langchain-anthropic>=0.1.0         # Optional: if switching to Claude
+langchain-groq>=0.1.0              # Optional: if switching to Groq
 alpaca-trade-api>=3.0.0
 sqlalchemy>=2.0.0
 pydantic>=2.0.0
 python-dotenv>=1.0.0
 httpx>=0.26.0
-hmac
+google-generativeai>=0.5.0         # Gemini SDK
 ```
 
 **Installing OpenClaw / ArmorClaw SDK:**
@@ -930,9 +944,16 @@ ALPACA_API_KEY=PKXXXXXXXXXXXXXXXX
 ALPACA_SECRET_KEY=your_alpaca_secret_key_here
 ALPACA_BASE_URL=https://paper-api.alpaca.markets
 
-# ── LLM Provider ─────────────────────────────────────────
-OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-OPENAI_MODEL=gpt-4o
+# ── LLM Provider (default: Gemini 2.5 Flash — FREE) ──────
+# Get your free key at: https://aistudio.google.com/
+GEMINI_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+LLM_PROVIDER=gemini                 # Options: gemini | openai | anthropic | groq
+LLM_MODEL=gemini-2.5-flash-preview  # The specific model to use
+
+# ── Optional: Other LLM providers (uncomment if switching) ─
+# OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # ── ArmorClaw / System Security ──────────────────────────
 # Generate with: python -c "import secrets; print(secrets.token_hex(32))"
@@ -1075,15 +1096,21 @@ it "wants" to call.                    before the LLM can execute it.
 No built-in logging.                   Every allowed tool call is logged for audit.
 ```
 
-**Registering an OpenClaw agent (simplified code):**
+**Registering an OpenClaw agent — using Gemini 2.5 Flash (simplified code):**
 ```python
 from openclaw import OpenClawAgent, Role
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+# Create the Gemini LLM (reads GEMINI_API_KEY from environment automatically)
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash-preview",
+    google_api_key=os.environ["GEMINI_API_KEY"]
+)
 
 analyst = OpenClawAgent(
     name="AnalystAgent",
     role=Role.ANALYST,
-    llm=ChatOpenAI(model="gpt-4o"),
+    llm=llm,  # ← Gemini 2.5 Flash
     allowed_tools=["market-data", "research"],  # Only these two tools allowed
     system_prompt="You are a market analyst. Propose trades based on data only."
 )
@@ -1094,12 +1121,121 @@ analyst = OpenClawAgent(
 
 | Resource | URL |
 |----------|-----|
+| **Gemini AI Studio (free API key)** | https://aistudio.google.com/ |
+| **Gemini 2.5 Flash docs** | https://ai.google.dev/gemini-api/docs/models/gemini |
+| LangChain Google GenAI integration | https://python.langchain.com/docs/integrations/chat/google_generative_ai |
 | LangGraph beginner tutorial | https://langchain-ai.github.io/langgraph/tutorials/introduction/ |
 | LangGraph official docs | https://langchain-ai.github.io/langgraph/ |
 | Alpaca paper trading quickstart | https://docs.alpaca.markets/docs/getting-started |
 | FastAPI tutorial (beginner) | https://fastapi.tiangolo.com/tutorial/ |
 | React + Vite getting started | https://vitejs.dev/guide/ |
 | Pydantic v2 docs | https://docs.pydantic.dev/latest/ |
+
+---
+
+## Multi-LLM Support
+
+AuraTrade is **LLM-agnostic**. The three agents (Analyst, Risk, Trader) are built on LangChain's chat model interface, which means you can swap the underlying LLM by:
+1. Installing the provider's LangChain package
+2. Changing the LLM object in `backend/config.py`
+3. Setting the API key in `.env`
+
+**Nothing else changes** — ArmorClaw, tool bindings, and the audit log are all LLM-independent.
+
+### Supported Providers at a Glance
+
+| Provider | Model | Free Tier? | `.env` Key | pip package |
+|----------|-------|-----------|-----------|-------------|
+| **Google Gemini** *(default)* | `gemini-2.5-flash-preview` | ✅ Yes — 1500 req/day | `GEMINI_API_KEY` | `langchain-google-genai` |
+| OpenAI | `gpt-4o`, `gpt-4o-mini` | ❌ No (pay-per-use) | `OPENAI_API_KEY` | `langchain-openai` |
+| Anthropic Claude | `claude-3-5-sonnet-latest` | ❌ No (pay-per-use) | `ANTHROPIC_API_KEY` | `langchain-anthropic` |
+| Groq (ultra-fast) | `llama-3.3-70b-versatile` | ✅ Yes — free tier | `GROQ_API_KEY` | `langchain-groq` |
+| Mistral | `mistral-large-latest` | ❌ No (pay-per-use) | `MISTRAL_API_KEY` | `langchain-mistralai` |
+| Ollama (local, no API) | `llama3.2`, `mistral`, etc. | ✅ Completely free | None | `langchain-ollama` |
+
+### How to Switch — Step by Step
+
+**Example: Switching from Gemini → Groq (also free)**
+
+**Step 1 — Install the package:**
+```bash
+pip install langchain-groq
+```
+
+**Step 2 — Update `.env`:**
+```env
+# Comment out Gemini:
+# GEMINI_API_KEY=...
+
+# Add Groq:
+GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+LLM_PROVIDER=groq
+LLM_MODEL=llama-3.3-70b-versatile
+```
+
+**Step 3 — `backend/config.py` reads the provider and returns the right LLM:**
+```python
+import os
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+from langchain_groq import ChatGroq
+
+def get_llm():
+    """Factory: returns the LLM configured in .env. Agents call this."""
+    provider = os.getenv("LLM_PROVIDER", "gemini").lower()
+    model    = os.getenv("LLM_MODEL", "gemini-2.5-flash-preview")
+
+    if provider == "gemini":
+        return ChatGoogleGenerativeAI(
+            model=model,
+            google_api_key=os.environ["GEMINI_API_KEY"]
+        )
+    elif provider == "openai":
+        return ChatOpenAI(
+            model=model,
+            api_key=os.environ["OPENAI_API_KEY"]
+        )
+    elif provider == "anthropic":
+        return ChatAnthropic(
+            model=model,
+            api_key=os.environ["ANTHROPIC_API_KEY"]
+        )
+    elif provider == "groq":
+        return ChatGroq(
+            model=model,
+            api_key=os.environ["GROQ_API_KEY"]
+        )
+    else:
+        raise ValueError(f"Unknown LLM_PROVIDER: {provider}")
+```
+
+**Step 4 — All agents use `get_llm()` — no other changes needed:**
+```python
+# In analyst_agent.py, risk_agent.py, trader_agent.py:
+from backend.config import get_llm
+
+llm = get_llm()  # ← automatically uses whatever is in .env
+
+analyst = OpenClawAgent(
+    name="AnalystAgent",
+    role=Role.ANALYST,
+    llm=llm,         # ← works with ANY provider
+    ...
+)
+```
+
+### Why Gemini 2.5 Flash is the Default
+
+| Reason | Detail |
+|--------|--------|
+| **Free to use** | 1,500 requests/day, no credit card, no billing setup |
+| **Fast** | Flash variant is optimized for low-latency responses |
+| **Long context** | 1M token context window (handles large market data dumps) |
+| **Tool calling** | Native function/tool calling support — required for LangGraph agents |
+| **Beginner-friendly** | Google AI Studio signup is simple — no waitlist, immediate access |
+
+> **Important:** Regardless of which LLM you choose, ArmorClaw's enforcement is **100% deterministic and LLM-independent**. The LLM only produces a trade proposal — ArmorClaw always makes the final allow/block decision using hard-coded rules.
 
 ---
 
