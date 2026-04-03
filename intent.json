@@ -1,0 +1,9 @@
+{
+  "goal": "paper-trading-demo",
+  "authorized_tickers": ["NVDA", "AAPL", "GOOGL", "MSFT"],
+  "risk_tolerance": "moderate",
+  "max_order_usd": 5000,
+  "max_daily_usd": 20000,
+  "intent_version": "1.0.0",
+  "intent_token_id": "auratrade-intent-v1-2024"
+}
