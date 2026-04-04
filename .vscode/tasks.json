@@ -1,0 +1,52 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "1. Launch OpenClaw Daemon",
+      "type": "shell",
+      "command": "if [ ! -d ~/openclaw-armoriq ]; then source .env && curl -fsSL https://armoriq.ai/install-armorclaw.sh | bash -s -- --gemini-key $GEMINI_API_KEY --api-key $ARMORIQ_API_KEY --no-prompt; fi; cd ~/openclaw-armoriq && pnpm dev gateway",
+      "problemMatcher": [],
+      "presentation": {
+        "group": "auratrade",
+        "label": "OpenClaw",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "2. Launch FastAPI Backend",
+      "type": "shell",
+      "command": "source venv/bin/activate && uvicorn backend.main:app --host 0.0.0.0 --port 8000",
+      "problemMatcher": [],
+      "presentation": {
+        "group": "auratrade",
+        "label": "Backend",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "3. Launch React Dashboard",
+      "type": "shell",
+      "command": "cd website && npm run dev",
+      "problemMatcher": [],
+      "presentation": {
+        "group": "auratrade",
+        "label": "Frontend",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "🚀 Start All Services",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "1. Launch OpenClaw Daemon",
+        "2. Launch FastAPI Backend",
+        "3. Launch React Dashboard"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}
