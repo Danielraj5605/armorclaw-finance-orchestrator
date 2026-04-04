@@ -5,17 +5,93 @@ AuraTrade is a high-security "security guard" for AI trading. Instead of giving 
 
 ---
 
-## 2. 🧩 Key Concepts (For Beginners)
-*   **AI Agent:** A smart digital intern that can research and plan but might occasionally make mistakes or be tricked.
-*   **Intent:** The "Owner's Manual." A permanent list of rules (e.g., "Never spend more than $5,000") that the AI cannot change.
-*   **Policy:** The specific "Laws" the system uses to judge an action (e.g., "Trading is only allowed during NYSE hours").
-*   **Enforcement:** The act of physically blocking a command. It isn't a suggestion; it’s a hard stop at the code level.
-*   **Delegation:** Giving an agent temporary, limited permission to do one specific task (like a "single-use permit").
-*   **Token:** A digital "Hall Pass" that proves an agent has been granted permission by the Risk Manager.
+## 2. 🏗️ High-Level Architecture
+The system is divided into four distinct layers, ensuring that intelligence is decoupled from execution authority.
+
+```mermaid
+graph TD
+    subgraph Layer1 [Layer 1: Intent Layer]
+        I[intent.json <br/><i>Immutable Rules</i>]
+    end
+
+    subgraph Layer2 [Layer 2: Agent Layer]
+        A[Analyst Agent <br/><i>Market Intelligence</i>] --> R[Risk Agent <br/><i>Exposure Gatekeeper</i>]
+        R --> T[Trader Agent <br/><i>Order Executor</i>]
+    end
+
+    subgraph Layer3 [Layer 3: Enforcement Layer]
+        AC[ArmorClaw Middleware <br/><i>Cryptographic Firewall</i>]
+        P[Policy Rules <br/><i>14 Hard Checks</i>]
+    end
+
+    subgraph Layer4 [Layer 4: Execution Layer]
+        ALP[Alpaca API <br/><i>Paper Trading</i>]
+    end
+
+    I -.->|Constraint Binding| AC
+    T -->|Tool Call| AC
+    AC -->|Rule Evaluation| P
+    AC -->|ALLOW| ALP
+```
 
 ---
 
-## 3. 🏗️ System Architecture (Step-by-Step)
+## 3. 🧩 Key Concepts (For Beginners)
+... (rest of section) ...
+
+---
+
+## 4. 🔁 Full System Flow (Sequential)
+This diagram illustrates the "Happy Path" where an authorized trade flows through the multi-agent pipeline and passes enforcement.
+
+```mermaid
+sequenceDiagram
+    participant U as User / UI
+    participant AN as Analyst Agent
+    participant RA as Risk Agent
+    participant TR as Trader Agent
+    participant EN as ArmorClaw (Enforcer)
+    participant AP as Alpaca API
+
+    U->>AN: Instruction (Buy NVDA)
+    AN->>RA: Trade Proposal ($4,000)
+    RA->>RA: Check Portfolio & Limits
+    RA->>TR: Delegation Token (Signed)
+    TR->>EN: Submit Order + Token
+    Note over EN: Run 5-Check Audit
+    EN->>AP: Execute Order (ALLOW)
+    AP-->>EN: Confirmation
+    EN-->>U: Final Success Update
+```
+
+---
+
+## 5. 🛡️ Enforcement Logic (The Decision Tree)
+ArmorClaw uses a deterministic decision tree. If any check fails, the trade is instantly killed.
+
+```mermaid
+flowchart TD
+    Start([Order Request Received]) --> C1{Check 1: <br/>Intent Binding}
+    C1 -- Pass --> C2{Check 2: <br/>Delegation Token}
+    C1 -- Fail --> Block([🔴 BLOCK & LOG])
+
+    C2 -- Pass --> C3{Check 3: <br/>Exposure & Limits}
+    C2 -- Fail --> Block
+
+    C3 -- Pass --> C4{Check 4: <br/>Regulatory/Time}
+    C3 -- Fail --> Block
+
+    C4 -- Pass --> C5{Check 5: <br/>Identity/Role}
+    C4 -- Fail --> Block
+
+    C5 -- Pass --> Allow([🟢 ALLOW & EXECUTE])
+    C5 -- Fail --> Block
+```
+
+---
+
+## 6. 🏗️ System Architecture (Step-by-Step)
+... (rest of file) ...
 
 ### Layer 1: Intent Layer (`intent.json`)
 *   **What it does:** Stores the user's absolute financial boundaries (Allowed tickers, Max order size).
