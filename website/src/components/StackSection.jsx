@@ -2,16 +2,16 @@ import { useRef } from 'react'
 import useIntersection from '../hooks/useIntersection'
 
 const STACK = [
-  { icon: '🐍', name: 'Python 3.11+',         role: 'Backend runtime',           color: 'var(--cyan)' },
-  { icon: '🔗', name: 'LangGraph',             role: 'Agent state machine',       color: 'var(--cyan)' },
-  { icon: '⚡', name: 'FastAPI',               role: 'REST + SSE API server',     color: 'var(--cyan)' },
-  { icon: '⚛️', name: 'React + Vite',          role: 'Dashboard frontend',        color: 'var(--cyan)' },
-  { icon: '⚙️', name: 'ArmorClaw SDK',         role: 'Enforcement engine',        color: '#b89cff' },
-  { icon: '📈', name: 'Alpaca Paper API',      role: 'Paper trading execution',   color: 'var(--cyan)' },
-  { icon: '🗄️', name: 'SQLite + SQLAlchemy',  role: 'Audit log persistence',     color: 'var(--cyan)' },
-  { icon: '💎', name: 'Gemini 2.5 Flash',     role: 'LLM (free tier, default)',  color: '#4ade80' },
-  { icon: '🔐', name: 'HMAC-SHA256',           role: 'Delegation token signing',  color: '#fbbf24' },
-  { icon: '📋', name: 'Pydantic v2',           role: 'Schema validation',         color: 'var(--cyan)' },
+  { icon: '🐍', name: 'Python 3.11+',         role: 'Backend runtime',                       color: 'var(--cyan)' },
+  { icon: '🔗', name: 'LangGraph',             role: 'Agent state machine (simulated in demo)', color: 'var(--cyan)' },
+  { icon: '⚡', name: 'FastAPI',               role: 'REST + SSE streaming API',              color: 'var(--cyan)' },
+  { icon: '⚛️', name: 'React + Vite',          role: 'Dashboard & landing page',              color: 'var(--cyan)' },
+  { icon: '⚙️', name: 'ArmorClaw Engine',      role: 'Custom enforcement engine (in-project)', color: '#b89cff' },
+  { icon: '📈', name: 'Alpaca Paper API',      role: 'Paper trading execution (httpx REST)',   color: 'var(--cyan)' },
+  { icon: '🗄️', name: 'SQLite + SQLAlchemy',  role: 'SHA-256 chained audit log',             color: 'var(--cyan)' },
+  { icon: '💬', name: 'Gemini 2.5 Flash',     role: 'Default LLM (configurable in .env)',    color: '#4ade80' },
+  { icon: '🔐', name: 'HMAC-SHA256',           role: 'Delegation token signing & verification', color: '#fbbf24' },
+  { icon: '📋', name: 'Pydantic v2',           role: 'Schema validation (intent + API)',       color: 'var(--cyan)' },
 ]
 
 export default function StackSection() {

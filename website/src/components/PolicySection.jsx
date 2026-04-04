@@ -13,15 +13,15 @@ const GROUPS = [
   {
     label: 'Ticker & Asset', color: 'var(--cyan)',
     rules: [
-      { id: 'ticker-universe-restriction', desc: 'Only NVDA · AAPL · GOOGL · MSFT allowed' },
+      { id: 'ticker-universe-restriction', desc: 'Only NVDA · AAPL · GOOGL · MSFT · AMZN · META · TSLA · BTC/USD · ETH/USD allowed (from intent.json)' },
     ],
   },
   {
     label: 'Time & Regulatory', color: '#fbbf24',
     rules: [
-      { id: 'market-hours-only',        desc: 'NYSE 09:30–16:00 ET, Mon–Fri only' },
-      { id: 'earnings-blackout-window', desc: 'No trades within ±2 days of earnings' },
-      { id: 'wash-sale-prevention',     desc: '30-day lock after a loss sale of same ticker' },
+      { id: 'market-hours-only',        desc: 'NYSE 09:30–16:00 ET, Mon–Fri. Crypto (BTC/USD, ETH/USD) exempt — trades 24/7' },
+      { id: 'earnings-blackout-window', desc: 'No trades within ±2 days of earnings. (Demo stub — logs pass, production would load earnings calendar)' },
+      { id: 'wash-sale-prevention',     desc: '30-day lock after a loss sale of same ticker. (Demo stub — production would check trade history)' },
     ],
   },
   {

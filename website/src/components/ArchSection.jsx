@@ -9,8 +9,8 @@ const AGENTS = [
   },
   {
     icon: '🛡️', name: 'Risk Agent', cyan: true,
-    desc: 'tools: get_positions, get_account',
-    detail: 'Read-only exposure gatekeeper. Validates concentration limits and daily spend. Issues HMAC-signed DelegationTokens with 60s TTL. Cannot execute anything.',
+    desc: 'tools: get_positions, get_account, calculate_exposure',
+    detail: 'Read-only exposure gatekeeper. Validates single-ticker (<40%) and sector (<60%) concentration. Computes post-trade exposure via calculate_exposure. Issues HMAC-SHA256 DelegationTokens with 60s TTL — the Trader must present a valid token or ArmorClaw blocks.',
   },
   {
     icon: '⚡', name: 'Trader Agent', cyan: false,
@@ -118,8 +118,8 @@ export default function ArchSection() {
         </div>
 
         <div style={{ marginTop: '2.5rem', padding: '1.2rem 1.8rem', background: 'rgba(124, 58, 237, 0.08)', border: '1px solid var(--border-purple)', borderRadius: '12px', fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: '#b89cff', lineHeight: 1.6, opacity: isVisible ? 1 : 0, transform: isVisible ? 'none' : 'translateY(20px)', transition: 'opacity 0.6s ease 0.5s, transform 0.6s ease 0.5s' }}>
-          🔒 <strong>ArmorClaw is unique</strong> — it is the only team that enforces a cryptographic delegation token chain between agents.
-          Risk Agent issues a HMAC-signed token. Trader must present it. ArmorClaw verifies signature, expiry, and field match before any order reaches Alpaca.
+          🔒 <strong>ArmorClaw is unique</strong> — it enforces a cryptographic delegation token chain between agents.
+          Risk Agent issues an HMAC-SHA256 signed token binding: action, ticker, max_amount_usd, expiry (60s TTL), handoff_count, and sub_delegation_allowed. ArmorClaw verifies all six fields plus signature before any order reaches Alpaca.
         </div>
 
         <div style={{ marginTop: '2.5rem', padding: '1.5rem', borderRadius: '12px', border: '1px solid rgba(0, 245, 255, 0.15)', background: 'rgba(0, 245, 255, 0.04)', textAlign: 'center', opacity: isVisible ? 1 : 0, transform: isVisible ? 'none' : 'translateY(20px)', transition: 'opacity 0.6s ease 0.6s, transform 0.6s ease 0.6s' }}>
