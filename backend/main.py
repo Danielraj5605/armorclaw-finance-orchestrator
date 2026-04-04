@@ -31,6 +31,7 @@ from backend.db.database import init_db, get_db, AuditLog
 from backend.armorclaw.engine import ArmorClawEngine
 from backend.alpaca.client import AlpacaClient
 from backend.agents.orchestrator import run_pipeline
+from backend.agents.real_openclaw_orchestrator import run_real_openclaw_pipeline
 from backend.openclaw_bridge import run_live_pipeline
 
 # ── Load intent.json ────────────────────────────────────────────
@@ -70,6 +71,28 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ── Root endpoint ─────────────────────────────────────────────
+@app.get("/")
+def root():
+    return {
+        "message": "AuraTrade API - Multi-Agent AI Trading Safety System",
+        "version": "2.0.0",
+        "endpoints": {
+            "health": "/health",
+            "run_trade": "/run-trade",
+            "stream": "/run-trade/stream/{run_id}",
+            "logs": "/get-logs",
+            "positions": "/get-positions"
+        },
+        "dashboard": "http://localhost:5173",
+        "openclaw_mode": OPENCLAW_MODE,
+    }
+
+# ── Favicon ───────────────────────────────────────────────────
+@app.get("/favicon.ico")
+def favicon():
+    return {"message": "No favicon"}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173").split(","),
@@ -105,11 +128,14 @@ async def run_trade(req: TradeRequest):
         # LIVE MODE: route command to real OpenClaw daemon
         # ArmorClaw plugin handles enforcement inside the daemon
         asyncio.create_task(
-            run_live_pipeline(
+            run_real_openclaw_pipeline(
                 run_id=run_id,
                 action=req.action,
                 ticker=req.ticker,
                 amount_usd=req.amount_usd,
+                intent=INTENT,
+                armorclaw=ARMORCLAW,
+                alpaca_client=ALPACA,
                 event_queues=EVENT_QUEUES,
             )
         )
