@@ -98,29 +98,31 @@ async def run_trade(req: TradeRequest):
         raise HTTPException(422, detail="action must be BUY or SELL")
     if req.amount_usd <= 0:
         raise HTTPException(422, detail="amount_usd must be positive")
+    if req.amount_usd < 1:
+        raise HTTPException(422, detail="minimum order is $1")
+    ticker = req.ticker.strip().upper()
+    if not ticker:
+        raise HTTPException(422, detail="ticker is required")
 
     run_id = str(uuid.uuid4())
 
     if OPENCLAW_MODE == "live":
-        # LIVE MODE: route command to real OpenClaw daemon
-        # ArmorClaw plugin handles enforcement inside the daemon
         asyncio.create_task(
             run_live_pipeline(
                 run_id=run_id,
                 action=req.action,
-                ticker=req.ticker,
+                ticker=ticker,
                 amount_usd=req.amount_usd,
                 event_queues=EVENT_QUEUES,
             )
         )
         pipeline_mode = "openclaw-live"
     else:
-        # DEMO MODE: simulated pipeline with our own Python ArmorClaw enforcement
         asyncio.create_task(
             run_pipeline(
                 run_id=run_id,
                 action=req.action,
-                ticker=req.ticker,
+                ticker=ticker,
                 amount_usd=req.amount_usd,
                 intent=INTENT,
                 armorclaw=ARMORCLAW,
@@ -223,24 +225,34 @@ def get_logs(
 # ── GET /get-positions ──────────────────────────────────────────
 @app.get("/get-positions")
 def get_positions():
+    alpaca_status = "connected"
     try:
         positions = ALPACA.get_positions()
         account   = ALPACA.get_account()
         equity    = account.get("equity", "100000")
-    except Exception:
-        positions = []
-        equity    = "100000"
+    except Exception as e:
+        positions    = []
+        equity       = "100000"
+        alpaca_status = f"error: {str(e)[:60]}"
 
     return {
         "positions":     positions,
         "total_equity":  equity,
-        "cached_at":     None,
+        "alpaca_status": alpaca_status,
     }
 
 
 # ── Health check ─────────────────────────────────────────────────
 @app.get("/health")
 def health():
+    # Quick Alpaca connectivity check
+    alpaca_ok = False
+    try:
+        acct = ALPACA.get_account()
+        alpaca_ok = bool(acct.get("id"))
+    except Exception:
+        pass
+
     return {
         "status":         "ok",
         "service":        "AuraTrade API",
@@ -248,5 +260,7 @@ def health():
         "openclaw_mode":  OPENCLAW_MODE,
         "openclaw_ws":    os.getenv("OPENCLAW_WS", "ws://127.0.0.1:18789") if OPENCLAW_MODE == "live" else "n/a",
         "intent_loaded":  bool(INTENT),
-        "armorclaw":      "active",
+        "armorclaw":      "active — 14 rules",
+        "alpaca":         "connected" if alpaca_ok else "unreachable",
+        "authorized_tickers": INTENT.get("authorized_tickers", []),
     }

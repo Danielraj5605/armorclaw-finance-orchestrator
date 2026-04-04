@@ -2,16 +2,16 @@ import { useRef } from 'react'
 import useIntersection from '../hooks/useIntersection'
 
 const STACK = [
-  { icon: '🐍', name: 'Python 3.11+',         role: 'Backend runtime',           color: 'var(--cyan)' },
-  { icon: '🔗', name: 'LangGraph',             role: 'Agent state machine',       color: 'var(--cyan)' },
-  { icon: '⚡', name: 'FastAPI',               role: 'REST + SSE API server',     color: 'var(--cyan)' },
-  { icon: '⚛️', name: 'React + Vite',          role: 'Dashboard frontend',        color: 'var(--cyan)' },
-  { icon: '⚙️', name: 'ArmorClaw SDK',         role: 'Enforcement engine',        color: '#b89cff' },
-  { icon: '📈', name: 'Alpaca Paper API',      role: 'Paper trading execution',   color: 'var(--cyan)' },
-  { icon: '🗄️', name: 'SQLite + SQLAlchemy',  role: 'Audit log persistence',     color: 'var(--cyan)' },
-  { icon: '💎', name: 'Gemini 2.5 Flash',     role: 'LLM (free tier, default)',  color: '#4ade80' },
-  { icon: '🔐', name: 'HMAC-SHA256',           role: 'Delegation token signing',  color: '#fbbf24' },
-  { icon: '📋', name: 'Pydantic v2',           role: 'Schema validation',         color: 'var(--cyan)' },
+  { icon: '🐍', name: 'Python 3.11+',            role: 'Backend runtime',           color: 'var(--cyan)' },
+  { icon: '🦞', name: 'OpenClaw v2026.3.2',      role: 'Agent orchestration',       color: 'var(--cyan)' },
+  { icon: '⚡', name: 'FastAPI',                 role: 'REST + SSE API server',     color: 'var(--cyan)' },
+  { icon: '⚛️', name: 'React + Vite',            role: 'Dashboard frontend',        color: 'var(--cyan)' },
+  { icon: '⚙️', name: 'ArmorClaw Engine',        role: 'Policy enforcement',        color: '#b89cff' },
+  { icon: '📈', name: 'Alpaca Paper API',        role: 'Paper trading execution',   color: 'var(--cyan)' },
+  { icon: '🗄️', name: 'SQLite + SQLAlchemy',    role: 'Audit log persistence',     color: 'var(--cyan)' },
+  { icon: '💎', name: 'OpenAI / Gemini / Claude', role: 'LLM reasoning (configurable)', color: '#4ade80' },
+  { icon: '🔐', name: 'HMAC-SHA256',             role: 'Delegation token signing',  color: '#fbbf24' },
+  { icon: '📋', name: 'Pydantic v2',             role: 'Schema validation',         color: 'var(--cyan)' },
 ]
 
 export default function StackSection() {

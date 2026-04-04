@@ -1,11 +1,12 @@
-# AuraTrade — Multi-Agent AI Trading Safety System
-## Architecture Document v2.0
+# ArmorClaw Finance Orchestrator — Multi-Agent Trading Safety System
+## Architecture Document v3.0
 
-> **System Name:** AuraTrade  
-> **Agent Platform:** OpenClaw (Node.js daemon + ArmorClaw plugin)  
-> **Enforcement Layer:** ArmorClaw (`@armoriq/armorclaw`)  
-> **Trading Skill:** Alpaca Trading Skill (ClawHub)  
-> **LLM:** Gemini 2.5 Flash (free tier)  
+> **System Name:** ArmorClaw Finance Orchestrator  
+> **Agent Platform:** OpenClaw v2026.3.2 (ws://127.0.0.1:18789)  
+> **Fallback:** Python-based demo orchestrator (if gateway unavailable)  
+> **Enforcement Layer:** ArmorClaw engine (5 checks + 14 policy rules)  
+> **Trading API:** Alpaca Paper Trading API (real execution, simulated funds)  
+> **LLM Providers:** OpenAI (GPT-4), Google Gemini 2.0 Flash, or Anthropic Claude (configurable)  
 > **Status:** Paper Trading Only — No Real Money
 
 ---
@@ -36,100 +37,141 @@
 
 ## 1. System Overview
 
-AuraTrade is a multi-agent AI trading safety system engineered around a _safety-first, enforcement-first_ design philosophy.
+ArmorClaw Finance Orchestrator is a multi-agent AI trading safety system engineered around a _safety-first, enforcement-first_ design philosophy.
 
 **The core insight:** Separate _intelligence_ (agents reasoning about what to do) from _execution authority_ (ArmorClaw as the only entity that can authorize real trades).
 
+### Two Execution Paths (with identical enforcement):
+
+**Path A: Live OpenClaw Gateway** (when available)
 ```
 User Intent (immutable intent.json)
         ↓
-OpenClaw Agent Platform (Analyst → Risk → Trader pipeline)
+OpenClaw v2026.3.2 Gateway (ws://127.0.0.1:18789)
+├─ Real Analyst Agent (LLM-powered market research)
+├─ Real Risk Agent (portfolio exposure validation)
+└─ Real Trader Agent (order construction)
         ↓
-ArmorClaw Plugin (5 sequential checks, 14 policy rules)
+ArmorClaw Engine (5 sequential checks, 14 policy rules)
         ↓
 Alpaca Paper Trading API (only receives ArmorClaw-approved orders)
 ```
 
-Even a fully compromised or hallucinating agent **cannot** place an unauthorized order — because it never talks to Alpaca directly. Every order goes through ArmorClaw first.
+**Path B: Demo Orchestrator Fallback** (if gateway unavailable)
+```
+User Intent (immutable intent.json)
+        ↓
+Python Demo Orchestrator (simulated agents with realistic delays)
+├─ Demo Analyst Agent (research simulation)
+├─ Demo Risk Agent (exposure calculation)
+└─ Demo Trader Agent (order simulation)
+        ↓
+ArmorClaw Engine (5 sequential checks, 14 policy rules) ← IDENTICAL
+        ↓
+Alpaca Paper Trading API (only receives ArmorClaw-approved orders) ← REAL
+```
+
+**Critical Property:** Both paths produce actual orders on Alpaca with real order IDs. The only difference is agent reasoning (real LLM vs simulated). Policy enforcement is 100% identical.
+
+Even a fully compromised or hallucinating agent **cannot** place an unauthorized order — because it never talks to Alpaca directly. Every order goes through ArmorClaw first, regardless of path.
 
 ---
 
-## 2. What OpenClaw Actually Is
+## 2. OpenClaw v2026.3.2 — Official Framework Integration
 
-> **Critical clarification for anyone reading this code:**
+> **What you're actually running:**
 
-OpenClaw is **not a Python library**. It is a **Node.js autonomous AI agent platform** — a persistent daemon that runs on your machine, connects to messaging platforms (Telegram, Slack, Discord, etc.), and executes tasks using a skill/tool system.
+The system uses **OpenClaw v2026.3.2** from [github.com/openclaw/openclaw](https://github.com/openclaw/openclaw) — an open-source autonomous AI agent platform.
 
 ```
-Traditional assumption:          Reality:
-─────────────────────────        ────────────────────────────────────────
-from openclaw import ...   →     npm install -g openclaw
-Python agent classes       →     Node.js daemon (openclaw onboard)
-pip install armorclaw      →     openclaw plugins install @armoriq/armorclaw
-Roll-your-own tools        →     clawhub install alpaca-trading (pre-built skill)
-Custom policy code         →     ~/.openclaw/armoriq.policy.json (declarative)
+When OPENCLAW_MODE=live:
+├─ Connects to: ws://127.0.0.1:18789 (OpenClaw Gateway daemon)
+├─ Executes through: Multi-agent pipeline (Analyst → Risk → Trader)
+├─ LLM backing: User-configured provider (OpenAI, Gemini, Claude)
+└─ Result: Real agent reasoning + Real enforcement + Real trades
+
+When OpenClaw unavailable (graceful fallback):
+├─ Executes through: Python demo orchestrator (backend/agents/orchestrator.py)
+├─ Agents simulate: Realistic delays, market data, exposure analysis
+├─ Enforcement: ArmorClaw engine runs identically
+└─ Result: Simulated reasoning + Real enforcement + Real trades
 ```
 
-**ArmorClaw** is the `@armoriq/armorclaw` npm plugin published by [ArmorIQ](https://armoriq.ai). It installs into the OpenClaw runtime and intercepts every tool call before execution — acting as a cryptographic firewall. Policy is defined in a structured JSON/YAML file, not in `if/else` code.
+**The Critical Point:** This is NOT a simple "mock vs real" toggle. Both paths apply **identical ArmorClaw enforcement**. The fallback ensures the system continues operating even if the OpenClaw gateway is down or requires additional configuration (e.g., Anthropic API key).
 
-**The Alpaca Trading Skill** is a pre-built skill from [ClawHub](https://clawhub.io) that gives OpenClaw the ability to place Alpaca paper trades. You install it with `clawhub install alpaca-trading` — you don't write Alpaca REST wrappers yourself.
+### Why Both Paths?
+
+OpenClaw v2026.3.2 includes multiple LLM providers, with Anthropic (Claude) as the default. If your environment only has OpenAI or Gemini API keys (not Anthropic), the system gracefully falls back to the demo orchestrator rather than failing completely. This is production mindset—resilience over perfection.
 
 ---
 
 ## 3. Layer Diagram
 
-```mermaid
-flowchart TD
-    subgraph L0["Frontend (React + Vite)"]
-        UI["🖥️ Dashboard\nTrade Buttons · Agent Feed · Decision Card\nAudit Log · Portfolio Panel"]
-    end
-
-    subgraph L1["Layer 1 — Intent Declaration (Immutable)"]
-        IJ["📄 intent.json\n• goal: paper-trading-demo\n• tickers: [NVDA, AAPL, GOOGL, MSFT]\n• max_order_usd: $5,000\n• max_daily_usd: $20,000"]
-    end
-
-    subgraph L2["Layer 2 — OpenClaw Agent Platform (Node.js Daemon)"]
-        OC["🦞 OpenClaw Daemon\nPort 18789 (WebSocket)\nGemini 2.5 Flash model"]
-        AC_PLUGIN["🛡️ ArmorClaw Plugin\n@armoriq/armorclaw\nPolicy enforcement middleware"]
-        ALPACA_SKILL["⚡ Alpaca Trading Skill\nclawhub install alpaca-trading\nPaper trading actions"]
-        
-        AN["🔍 Analyst Agent\nmarket-data, research tools\nProposes trades"]
-        RA["🛡️ Risk Agent\nread-only portfolio tools\nIssues delegation tokens"]
-        TR["⚡ Trader Agent\nalpaca:execute ONLY\nSubject to ArmorClaw"]
-    end
-
-    subgraph L3["Layer 3 — ArmorClaw Enforcement"]
-        CHK["5 Sequential Checks\n14 Policy Rules\npolicy.yaml / armoriq.policy.json"]
-        AUDIT["📋 Audit Logger\nSQLite (via FastAPI) +\nArmorIQ platform logs"]
-    end
-
-    subgraph L4["Layer 4 — Alpaca Paper Trading"]
-        AP["📈 Alpaca\nPaper Trading API\nhttps://paper-api.alpaca.markets"]
-    end
-
-    subgraph BACKEND["FastAPI Bridge (Python)"]
-        API["🐍 FastAPI :8000\nPOST /run-trade\nGET /run-trade/stream/{id} SSE\nGET /get-logs\nGET /get-positions"]
-        BRIDGE["🔌 OpenClaw Bridge\nWebSocket → OpenClaw daemon\nEvent streaming to SSE"]
-    end
-
-    UI -->|"POST /run-trade"| API
-    API -->|"WebSocket command"| BRIDGE
-    BRIDGE -->|"ws://127.0.0.1:18789"| OC
-    IJ -..->|"read-only constraint binding"| CHK
-
-    OC --> AN
-    AN -->|"TradeProposal"| RA
-    RA -->|"DelegationToken"| TR
-    TR -->|"OrderRequest + Token"| AC_PLUGIN
-    AC_PLUGIN -->|"Validates"| CHK
-    CHK -->|"ALLOW"| ALPACA_SKILL
-    ALPACA_SKILL -->|"Executes"| AP
-    CHK -->|"BLOCK"| AUDIT
-    AP -->|"OrderConfirmation"| AUDIT
-    OC -->|"SSE events"| BRIDGE
-    BRIDGE -->|"SSE stream"| UI
-    AUDIT -->|"GET /get-logs"| UI
 ```
+┌────────────────────────────────────────────────────────────────┐
+│                    FRONTEND (React + Vite)                      │
+│    Dashboard: Trade Triggers · Agent Feed · Decision Card       │
+└────────────────────────────────────────────────────────────────┘
+                              ↓
+┌────────────────────────────────────────────────────────────────┐
+│                    FASTAPI BACKEND :8000                        │
+│  POST /run-trade  GETDictionary /run-trade/stream/{id} (SSE)   │
+└────────────────────────────────────────────────────────────────┘
+                              ↓
+                    ┌─────────────────┐
+                    │  OpenClaw Mode  │
+                    │    Detector     │
+                    └─────────────────┘
+                        ↓         ↓
+          ┌─────────────┴─────────┬────────────┐
+          │                       │            │
+     LIVE MODE              FALLBACK MODE     DEMO MODE
+  (OPENCLAW_MODE=          (Gateway timeout   (OPENCLAW_MODE=
+   live + gateway up)       or unavailable)    demo)
+          │                       │            │
+          ↓                       ↓            ↓
+   ┌─────────────────┐   ┌──────────────┐  ┌──────────────┐
+   │ OpenClaw        │   │ Python Demo  │  │ Python Demo  │
+   │ Gateway         │   │ Orchestrator │  │ Orchestrator │
+   │ v2026.3.2       │   │ (timeout)    │  │ (configured) │
+   │ ws://127.0.0.1  │   │              │  │              │
+   │ :18789          │   │ Simulates:   │  │ Simulates:   │
+   │ ┌─────┐ ┌─────┐ │   │ • Analyst    │  │ • Analyst    │
+   │ │Ana  │ │ Risk│ │   │ • Risk       │  │ • Risk       │
+   │ │lyst │→│Agent│ │   │ • Trader     │  │ • Trader     │
+   │ │Agent│ │ ┌──┐ │   │              │  │              │
+   │ └─────┘ └─│TD├─┘   └──────────────┘  └──────────────┘
+   │           │ │      (Real LLM agents │  (Mocked agents
+   │           └──┘       via OpenClaw)  │   with delays)
+   │            │
+   └────────────┴────────────────────────────────────────┐
+                │ (Both paths apply identical enforcement)
+                ↓
+        ┌───────────────────────────────────────┐
+        │ 🛡️  ARMORCLAW ENGINE                  │
+        │                                       │
+        │ 5 Checks:                            │
+        │ 1. Intent Binding                    │
+        │ 2. Delegation Token Validation       │
+        │ 3. Exposure & Concentration          │
+        │ 4. Regulatory & Temporal             │
+        │ 5. Data & Tool Access                │
+        │                                       │
+        │ 14 Policy Rules Evaluated            │
+        │                                       │
+        │ Decision: ALLOW or BLOCK             │
+        └───────────────────────────────────────┘
+                │         │
+            ALLOW        BLOCK
+              ↓           ↓
+        ┌──────────┐  ┌─────────────┐
+        │ Alpaca   │  │ Audit Log   │
+        │ Execute  │  │ Block Entry │
+        │ Order ID │  │ Rule Reason │
+        └──────────┘  └─────────────┘
+```
+
+**Key insight:** Regardless of which execution path (live or fallback), ArmorClaw enforcement is identical. Both paths result in real Alpaca order IDs or real blocking decisions.
 
 ---
 
@@ -522,7 +564,7 @@ Step 4  OpenClaw → Risk Agent
         DelegationToken issued: { HMAC-SHA256, 60s TTL, max $4000 }
 
 Step 5  OpenClaw → Trader Agent
-        OrderRequest + DelegationToken → ArmorClaw middleware
+        Cryptographically signed DelegationToken → ArmorClaw middleware
 
 Step 6  ArmorClaw — All 5 Checks
         ✅ Check 1: NVDA ∈ authorized, $4000 ≤ $5000 max

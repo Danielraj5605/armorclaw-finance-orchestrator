@@ -7,12 +7,14 @@ For the hackathon demo, agents produce realistic outputs with async delays.
 import asyncio
 import uuid
 import json
+import os
 import hmac
 import hashlib
 from datetime import datetime, timezone, timedelta
 from typing import AsyncGenerator
 
 from backend.armorclaw.engine import ArmorClawEngine
+from backend.armorclaw.audit_logger import update_alpaca_order_id
 
 
 def _make_token(
@@ -86,9 +88,10 @@ async def run_pipeline(
         await asyncio.sleep(0.4)
 
         # ── Risk Agent ─────────────────────────────────────────────
+        asset_type = "crypto" if "/" in ticker else "equity"
         await emit("agent_activity", {
             "agent": "RiskAgent", "status": "running",
-            "message": f"get_positions → {ticker}: 12% of portfolio (read-only)"
+            "message": f"get_positions → {ticker} ({asset_type}): checking portfolio exposure"
         })
         await asyncio.sleep(0.6)
 
@@ -103,9 +106,10 @@ async def run_pipeline(
         secret = os.getenv("ARMORCLAW_SECRET_KEY", "demo-secret-key-32-chars-minimum!")
         token  = _make_token(action, ticker, amount_usd, secret, intent)
 
+        market_note = "24/7 crypto market" if "/" in ticker else "NYSE session"
         await emit("agent_activity", {
             "agent": "RiskAgent", "status": "complete",
-            "message": f"DelegationToken issued | TTL: 60s | HMAC-SHA256 signed | id: {token['token_id'][:8]}..."
+            "message": f"DelegationToken issued | TTL: 60s | HMAC-SHA256 signed | {market_note} | id: {token['token_id'][:8]}..."
         })
         await asyncio.sleep(0.4)
 
@@ -147,14 +151,30 @@ async def run_pipeline(
             intent_token_id_in_request=intent.get("intent_token_id"),
         )
 
-        # If ALLOW, place order on Alpaca
+        # If ALLOW, place order on Alpaca and update audit entry
         alpaca_order_id = None
         if decision["decision"] == "ALLOW":
+            audit_id = decision.get("audit_id")
             try:
                 alpaca_order_id = alpaca_client.place_order(action, ticker, amount_usd)
+                is_real = not alpaca_order_id.startswith("sim-order")
                 decision["alpaca_order_id"] = alpaca_order_id
+                if audit_id:
+                    update_alpaca_order_id(audit_id, alpaca_order_id)
+                await emit("agent_activity", {
+                    "agent": "TraderAgent", "status": "complete",
+                    "message": (
+                        f"✅ Order FILLED on Alpaca Paper | id: {alpaca_order_id[:16]}..."
+                        if is_real else
+                        f"⚠️ Alpaca unreachable — sim fallback | id: {alpaca_order_id[:20]}..."
+                    )
+                })
             except Exception as e:
                 decision["alpaca_order_id"] = f"sim-{run_id[:8]}"
+                await emit("agent_activity", {
+                    "agent": "TraderAgent", "status": "error",
+                    "message": f"Alpaca error: {str(e)[:80]}"
+                })
 
         # Emit ArmorClaw decision
         await emit("armorclaw_decision", decision)

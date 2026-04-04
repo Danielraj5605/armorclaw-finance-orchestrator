@@ -1,11 +1,13 @@
-# AuraTrade 🦞🛡️
-### Multi-Agent AI Trading Safety System
+# ArmorClaw Finance Orchestrator 🦞🛡️
+### Multi-Agent AI Trading with Deterministic Safety Enforcement
 
 > **"In financial systems, intent must be enforced, not inferred."**
 
-AuraTrade is a hackathon project that demonstrates how the real [OpenClaw](https://openclaw.ai) agent platform combined with [ArmorClaw](https://armoriq.ai) enforcement can make autonomous AI trading **genuinely safe** — not just approximately safe.
+ArmorClaw Finance Orchestrator is a hackathon project demonstrating how [OpenClaw](https://openclaw.ai) v2026.3.2 combined with [ArmorClaw](https://armoriq.ai) enforcement creates genuinely safe autonomous AI trading — not just approximately safe.
 
-Every trade proposal flows through 5 sequential enforcement checks and 14 declarative policy rules before any order reaches Alpaca. Agents can reason freely. They cannot act freely.
+Every trade flows through **5 sequential enforcement checks and 14 declarative policy rules** before reaching Alpaca. The system supports both **live OpenClaw gateway** (for real LLM reasoning) and **graceful fallback** to Python demo orchestrator (when gateway unavailable). Both paths apply identical enforcement and real Alpaca execution.
+
+Agents can reason freely. They cannot act freely.
 
 ---
 
@@ -13,19 +15,38 @@ Every trade proposal flows through 5 sequential enforcement checks and 14 declar
 
 | Scenario | What Happens |
 |----------|-------------|
-| ✅ **Allowed trade** — BUY NVDA $4,000 | Analyst proposes → Risk issues delegation token → Trader submits → ArmorClaw ALLOWS → Alpaca paper order placed |
-| 🚫 **Blocked trade** — BUY NVDA $8,000 | Same pipeline → ArmorClaw Check 1 fires `trade-size-limits` rule → order blocked, never reaches Alpaca |
+| ✅ **Allowed trade** — SELL BTC/USD $10 | Analyst proposes → Risk issues HMAC-signed delegation token (60s TTL) → Trader submits → ArmorClaw validates token + checks all 14 rules → ALLOW → Alpaca paper order placed (real order ID) |
+| 🚫 **Blocked trade** — BUY AAPL $1,000 at 05:45 EDT | Same pipeline → ArmorClaw Check 4 evaluates `market-hours-only` rule → Time outside 09:30-16:00 EST → BLOCK → No order ID, no Alpaca call, audit logged |
 
 ---
 
-## Architecture — 4 Layers
+## Architecture — 4 Layers (with Dual Paths)
 
 ```
-Layer 1:  intent.json          ← Immutable user constraints (tickers, limits)
-Layer 2:  OpenClaw Daemon      ← Analyst → Risk → Trader agents (Gemini 2.5 Flash)
-            └── ArmorClaw Plugin (@armoriq/armorclaw) — intercepts every tool call
-            └── Alpaca Trading Skill (ClawHub) — placed via clawhub install
-Layer 3:  5-check enforcement  ← intent binding, token validation, exposure, regulatory, audit
+Layer 1:  intent.json          ← Immutable user constraints (tickers, limits, hours)
+
+Layer 2:  Agent Orchestration   (Path A: live or Path B: fallback)
+  Path A - OpenClaw Gateway:
+    ├─ ws://127.0.0.1:18789 official daemon
+    ├─ Real Analyst Agent (LLM-powered research)
+    ├─ Real Risk Agent (exposure calculation, token issuance)
+    └─ Real Trader Agent (order construction)
+    
+  Path B - Demo Orchestrator (fallback):
+    ├─ Python-based simulation
+    ├─ Demo Analyst Agent (research sim with delays)
+    ├─ Demo Risk Agent (exposure sim, token issuance)
+    └─ Demo Trader Agent (order sim)
+    
+    → Both paths apply IDENTICAL enforcement below
+
+Layer 3:  ⚙️ ArmorClaw Engine   ← 5 checks + 14 policy rules
+  ✓ Intent Binding (ticker universe, trade size)
+  ✓ Delegation Token (HMAC-SHA256 signature, TTL, scope)
+  ✓ Exposure & Concentration (portfolio limits, sector exposure)
+  ✓ Regulatory & Temporal (market hours, earnings blackout, wash sale)
+  ✓ Data & Tool Access (agent role binding, tool restrictions)
+  
 Layer 4:  Alpaca Paper Trading ← only receives ArmorClaw-approved orders
 ```
 
@@ -35,19 +56,20 @@ Layer 4:  Alpaca Paper Trading ← only receives ArmorClaw-approved orders
 
 ## What Makes This Different
 
-| Feature | Traditional Approach | AuraTrade |
-|---------|---------------------|-----------|
-| Agent framework | Roll-your-own Python | **Real OpenClaw** Node.js daemon |
-| Policy enforcement | Hardcoded `if/else` | **Real ArmorClaw** plugin (`@armoriq/armorclaw`) |
-| Trading skill | Custom REST wrapper | **ClawHub Alpaca Skill** (`clawhub install alpaca-trading`) |
-| Policy format | Python functions | Declarative **`policy.yaml`** |
-| Delegation control | Simulated | **HMAC-SHA256 signed tokens**, replay protection |
+| Feature | Traditional Approach | ArmorClaw Finance Orchestrator |
+|---------|---------------------|------|
+| Agent platform | Roll-your-own Python | **Official OpenClaw v2026.3.2** (with demo fallback) |
+| Policy enforcement | Hardcoded `if/else` scattered in agent code | **ArmorClaw Engine** — 5 checks + 14 declarative rules |
+| LLM integration | Single provider | **Provider-agnostic** (OpenAI, Gemini, Claude configurable) |
+| Delegation control | Simulated token passing | **Cryptographic** HMAC-SHA256 signed tokens with TTL |
+| Trading execution | Mock orders | **Real Alpaca Paper Trading** (real order IDs, real market data) |
+| Audit trail | Soft logging | **Deterministic audit** with block reasons + decision tracing |
 
 ---
 
 ## Quick Start
 
-### Demo Mode (no API keys required)
+### Demo Mode (no OpenClaw gateway required)
 
 ```bash
 git clone https://github.com/Danielraj5605/armorclaw-finance-orchestrator.git

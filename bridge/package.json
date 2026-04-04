@@ -1,0 +1,15 @@
+{
+  "name": "openclaw-bridge",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "OpenClaw SDK bridge for AuraTrade Python agents",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@openclaw/client": "latest"
+  },
+  "scripts": {
+    "test": "node test_bridge.mjs"
+  }
+}

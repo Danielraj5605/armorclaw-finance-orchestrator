@@ -74,16 +74,16 @@ function AgentBox({ icon, name, desc, detail, cyan, visible, delay }) {
 }
 
 export default function ArchSection() {
-  const sectionRef  = useRef(null)
+  const sectionRef = useRef(null)
   const agentRowRef = useRef(null)
-  const isVisible   = useIntersection(sectionRef)
+  const isVisible = useIntersection(sectionRef)
   const agentRowVis = useIntersection(agentRowRef)
 
   return (
     <section id="architecture" ref={sectionRef} style={{ padding: '7rem 2rem', background: 'linear-gradient(180deg, #001420 0%, #00080f 100%)', position: 'relative', zIndex: 1 }}>
       <div style={{ textAlign: 'center', marginBottom: '3.5rem', opacity: isVisible ? 1 : 0, transform: isVisible ? 'none' : 'translateY(24px)', transition: 'opacity 0.6s ease, transform 0.6s ease' }}>
         <span className="section-label">System Architecture</span>
-        <h2 className="section-title">How AuraTrade Enforces Safety</h2>
+        <h2 className="section-title">How ArmorClaw Enforces Safety</h2>
         <p className="section-sub">Three role-bound agents. One deterministic enforcement engine. Zero trust between layers.</p>
       </div>
 
@@ -93,7 +93,7 @@ export default function ArchSection() {
         </div>
         <div style={CONNECTOR_V} />
         <div style={{ textAlign: 'center' }}>
-          <span style={{ ...BOX_BASE, padding: '0.65rem 2.8rem', border: '1px solid rgba(0,245,255,0.5)' }}>LangGraph Orchestrator (OpenClaw)</span>
+          <span style={{ ...BOX_BASE, padding: '0.65rem 2.8rem', border: '1px solid rgba(0,245,255,0.5)' }}>OpenClaw v2026.3.2</span>
         </div>
         <BranchConnector count={3} />
 
@@ -104,7 +104,7 @@ export default function ArchSection() {
         <MergeConnector count={3} />
 
         <div style={{ textAlign: 'center' }}>
-          <span style={{ ...BOX_BASE, padding: '0.65rem 2.2rem' }}>OrderRequest + DelegationToken</span>
+          <span style={{ ...BOX_BASE, padding: '0.65rem 2.2rem' }}>Cryptographically signed DelegationToken</span>
         </div>
         <div style={CONNECTOR_V} />
         <div style={{ textAlign: 'center' }}>
@@ -129,7 +129,149 @@ export default function ArchSection() {
           </p>
         </div>
       </div>
-      <style>{`@media (max-width:600px){#architecture{padding:4rem 1rem !important;}}`}</style>
+
+      {/* DelegationToken Cryptographic Flow */}
+      <div style={{ marginTop: '5rem', maxWidth: '1100px', margin: '5rem auto 0' }}>
+        <div style={{ textAlign: 'center', marginBottom: '2.5rem', opacity: isVisible ? 1 : 0, transform: isVisible ? 'none' : 'translateY(24px)', transition: 'opacity 0.6s ease 0.3s, transform 0.6s ease 0.3s' }}>
+          <span className="section-label">Deep Dive: Token Security</span>
+          <h3 style={{ fontSize: '1.4rem', color: 'var(--text)', marginTop: '0.8rem', fontFamily: 'var(--font-heading)' }}>DelegationToken + HMAC-SHA256 Cryptography</h3>
+        </div>
+
+        {/* Token Flow Diagram */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginTop: '2rem' }}>
+          {/* Step 1: Risk Agent Creates Token */}
+          <div style={{ padding: '1.5rem', border: '1px solid rgba(0,245,255,0.4)', borderRadius: '12px', background: 'rgba(0,245,255,0.06)', transition: 'all 0.4s ease', opacity: isVisible ? 1 : 0, transform: isVisible ? 'none' : 'translateY(20px)' }}>
+            <div style={{ fontSize: '1.8rem', marginBottom: '0.8rem' }}>🛡️</div>
+            <h4 style={{ color: 'var(--cyan)', fontSize: '0.9rem', fontFamily: 'var(--font-heading)', marginBottom: '1rem', letterSpacing: '0.03em' }}>STEP 1: Risk Agent Creates Payload</h4>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.8, background: 'rgba(0,0,0,0.3)', padding: '0.8rem', borderRadius: '6px', textAlign: 'left' }}>
+              <div style={{ color: '#80d4ff' }}>let payload = {'{'}  </div>
+              <div style={{ marginLeft: '1rem', color: '#b3e5fc' }}>ticker: "AAPL",  </div>
+              <div style={{ marginLeft: '1rem', color: '#b3e5fc' }}>amount: 100,  </div>
+              <div style={{ marginLeft: '1rem', color: '#b3e5fc' }}>action: "BUY",  </div>
+              <div style={{ marginLeft: '1rem', color: '#b3e5fc' }}>exposure: 0.15,  </div>
+              <div style={{ marginLeft: '1rem', color: '#b3e5fc' }}>timestamp: 1712275200,  </div>
+              <div style={{ marginLeft: '1rem', color: '#b3e5fc' }}>expiry: 60  </div>
+              <div style={{ color: '#80d4ff' }}>{'}'}</div>
+            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.8rem', lineHeight: 1.5 }}>Read-only analysis. No private keys. No direct execution capability.</p>
+          </div>
+
+          {/* Step 2: HMAC-SHA256 Signing */}
+          <div style={{ padding: '1.5rem', border: '1px solid rgba(124,58,237,0.4)', borderRadius: '12px', background: 'rgba(124,58,237,0.06)', transition: 'all 0.4s ease', opacity: isVisible ? 1 : 0, transform: isVisible ? 'none' : 'translateY(20px)', transitionDelay: '0.1s' }}>
+            <div style={{ fontSize: '1.8rem', marginBottom: '0.8rem' }}>🔐</div>
+            <h4 style={{ color: '#b89cff', fontSize: '0.9rem', fontFamily: 'var(--font-heading)', marginBottom: '1rem', letterSpacing: '0.03em' }}>STEP 2: HMAC-SHA256 Signing</h4>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.8, background: 'rgba(0,0,0,0.3)', padding: '0.8rem', borderRadius: '6px', textAlign: 'left' }}>
+              <div style={{ color: '#d4b5ff' }}>signature = HMAC-SHA256(</div>
+              <div style={{ marginLeft: '1rem', color: '#e8d4ff' }}>payload,  </div>
+              <div style={{ marginLeft: '1rem', color: '#e8d4ff' }}>shared_secret  </div>
+              <div style={{ color: '#d4b5ff' }}>)  </div>
+              <div style={{ marginTop: '0.8rem', color: '#ffd700', background: 'rgba(255,215,0,0.1)', padding: '0.6rem', borderRadius: '4px' }}>→ 256-bit hash</div>
+            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.8rem', lineHeight: 1.5 }}>Secret stored securely. Signature proves authorization intent.</p>
+          </div>
+
+          {/* Step 3: Token Transmission */}
+          <div style={{ padding: '1.5rem', border: '1px solid rgba(0,245,255,0.4)', borderRadius: '12px', background: 'rgba(0,245,255,0.06)', transition: 'all 0.4s ease', opacity: isVisible ? 1 : 0, transform: isVisible ? 'none' : 'translateY(20px)', transitionDelay: '0.2s' }}>
+            <div style={{ fontSize: '1.8rem', marginBottom: '0.8rem' }}>⚡</div>
+            <h4 style={{ color: 'var(--cyan)', fontSize: '0.9rem', fontFamily: 'var(--font-heading)', marginBottom: '1rem', letterSpacing: '0.03em' }}>STEP 3: Token Transmitted to Trader</h4>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.8, background: 'rgba(0,0,0,0.3)', padding: '0.8rem', borderRadius: '6px', textAlign: 'left' }}>
+              <div style={{ color: '#80d4ff' }}>delegationToken = {'{'}  </div>
+              <div style={{ marginLeft: '1rem', color: '#b3e5fc' }}>payload: {'{'}...{'}'},{'\u00A0'} </div>
+              <div style={{ marginLeft: '1rem', color: '#b3e5fc' }}>signature: "a7f3...",...  </div>
+              <div style={{ marginLeft: '1rem', color: '#b3e5fc' }}>issuedAt: 1712275200  </div>
+              <div style={{ color: '#80d4ff' }}>{'}'}</div>
+            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.8rem', lineHeight: 1.5 }}>Trader cannot forge. Cannot modify. Only passes through.</p>
+          </div>
+        </div>
+
+        {/* Verification Flow */}
+        <div style={{ marginTop: '2.5rem', padding: '1.8rem', border: '2px solid rgba(0,245,255,0.3)', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(0,245,255,0.04) 0%, rgba(124,58,237,0.04) 100%)', opacity: isVisible ? 1 : 0, transform: isVisible ? 'none' : 'translateY(20px)', transition: 'opacity 0.6s ease 0.3s, transform 0.6s ease 0.3s' }}>
+          <h4 style={{ color: 'var(--cyan)', fontSize: '0.95rem', fontFamily: 'var(--font-heading)', marginBottom: '1.5rem', letterSpacing: '0.03em' }}>ArmorClaw Verification Pipeline</h4>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Check 1 */}
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', minWidth: '32px', borderRadius: '6px', background: 'rgba(0,245,255,0.15)', border: '1px solid rgba(0,245,255,0.5)', color: 'var(--cyan)', fontSize: '0.9rem', fontWeight: 'bold' }}>1</div>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text)', fontFamily: 'var(--font-heading)' }}>Signature Verification</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                  <code style={{ background: 'rgba(0,0,0,0.3)', padding: '0.2rem 0.4rem', borderRadius: '3px', color: '#80d4ff' }}>HMAC-SHA256(payload, secret)</code> must match received signature
+                </div>
+              </div>
+              <div style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#4ade80', fontWeight: 'bold', background: 'rgba(74,222,128,0.1)', padding: '0.3rem 0.8rem', borderRadius: '4px' }}>✓ PASS</div>
+            </div>
+
+            {/* Check 2 */}
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', minWidth: '32px', borderRadius: '6px', background: 'rgba(0,245,255,0.15)', border: '1px solid rgba(0,245,255,0.5)', color: 'var(--cyan)', fontSize: '0.9rem', fontWeight: 'bold' }}>2</div>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text)', fontFamily: 'var(--font-heading)' }}>Expiry Validation</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                  <code style={{ background: 'rgba(0,0,0,0.3)', padding: '0.2rem 0.4rem', borderRadius: '3px', color: '#80d4ff' }}>now - issuedAt &lt; 60 seconds</code> — Token must be fresh
+                </div>
+              </div>
+              <div style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#4ade80', fontWeight: 'bold', background: 'rgba(74,222,128,0.1)', padding: '0.3rem 0.8rem', borderRadius: '4px' }}>✓ PASS</div>
+            </div>
+
+            {/* Check 3 */}
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', minWidth: '32px', borderRadius: '6px', background: 'rgba(0,245,255,0.15)', border: '1px solid rgba(0,245,255,0.5)', color: 'var(--cyan)', fontSize: '0.9rem', fontWeight: 'bold' }}>3</div>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text)', fontFamily: 'var(--font-heading)' }}>Scope Binding</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                  <code style={{ background: 'rgba(0,0,0,0.3)', padding: '0.2rem 0.4rem', borderRadius: '3px', color: '#80d4ff' }}>token.payload.ticker == OrderRequest.ticker</code> — Ticker unchanged
+                </div>
+              </div>
+              <div style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#4ade80', fontWeight: 'bold', background: 'rgba(74,222,128,0.1)', padding: '0.3rem 0.8rem', borderRadius: '4px' }}>✓ PASS</div>
+            </div>
+
+            {/* Check 4 */}
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', minWidth: '32px', borderRadius: '6px', background: 'rgba(0,245,255,0.15)', border: '1px solid rgba(0,245,255,0.5)', color: 'var(--cyan)', fontSize: '0.9rem', fontWeight: 'bold' }}>4</div>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text)', fontFamily: 'var(--font-heading)' }}>Exposure Ceiling</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                  <code style={{ background: 'rgba(0,0,0,0.3)', padding: '0.2rem 0.4rem', borderRadius: '3px', color: '#80d4ff' }}>token.payload.exposure &lt;= max_allowed</code> — Limits enforced
+                </div>
+              </div>
+              <div style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#4ade80', fontWeight: 'bold', background: 'rgba(74,222,128,0.1)', padding: '0.3rem 0.8rem', borderRadius: '4px' }}>✓ PASS</div>
+            </div>
+
+            {/* Result */}
+            <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: '8px', background: 'rgba(0,245,255,0.08)', border: '1px solid rgba(0,245,255,0.4)', textAlign: 'center' }}>
+              <div style={{ fontSize: '1.2rem', color: '#4ade80', fontWeight: 'bold', marginBottom: '0.4rem' }}>✓ ALL CHECKS PASSED</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Order forwarded to Alpaca with encrypted confirmation</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Key Security Points */}
+        <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+          <div style={{ padding: '1rem', borderRadius: '8px', background: 'rgba(0,245,255,0.06)', border: '1px solid rgba(0,245,255,0.2)' }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--cyan)', marginBottom: '0.5rem' }}>🔒 Non-Forgeable</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>256-bit HMAC signature prevents modification. Trader cannot change ticker or amount.</div>
+          </div>
+          <div style={{ padding: '1rem', borderRadius: '8px', background: 'rgba(0,245,255,0.06)', border: '1px solid rgba(0,245,255,0.2)' }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--cyan)', marginBottom: '0.5rem' }}>⏱️ Time-Bound</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>60-second TTL prevents replay attacks. Expired tokens rejected automatically.</div>
+          </div>
+          <div style={{ padding: '1rem', borderRadius: '8px', background: 'rgba(0,245,255,0.06)', border: '1px solid rgba(0,245,255,0.2)' }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--cyan)', marginBottom: '0.5rem' }}>🎯 Scope-Bound</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>Token locked to specific ticker/amount. Prevents scope expansion or switching.</div>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @media (max-width:600px){
+          #architecture{padding:4rem 1rem !important;}
+        }
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+      `}</style>
     </section>
   )
 }

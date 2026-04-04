@@ -24,14 +24,14 @@ class AuditLog(Base):
     __tablename__ = "audit_log"
 
     id                  = Column(Integer, primary_key=True, index=True)
-    timestamp           = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    run_id              = Column(String(64))
+    timestamp           = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    run_id              = Column(String(64), index=True)
     agent               = Column(String(50))
     tool                = Column(String(100))
     action              = Column(String(10))
-    ticker              = Column(String(10))
+    ticker              = Column(String(20))   # up to 20 chars for crypto (BTC/USD etc.)
     amount_usd          = Column(Float)
-    decision            = Column(String(10))   # ALLOW | BLOCK
+    decision            = Column(String(10), index=True)  # ALLOW | BLOCK
     rule_id             = Column(String(255), nullable=True)
     block_reason        = Column(Text, nullable=True)
     check_number        = Column(Integer, nullable=True)

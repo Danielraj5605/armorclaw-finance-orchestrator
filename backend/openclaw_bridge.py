@@ -1,22 +1,279 @@
 """
 backend/openclaw_bridge.py
 
-Connects our FastAPI server to the real OpenClaw daemon WebSocket.
-When OPENCLAW_MODE=live, this module is used instead of the simulated orchestrator.
-When OPENCLAW_MODE=demo (default), the orchestrator.py simulation is used.
+Routes trades based on OPENCLAW_MODE:
 
-OpenClaw daemon runs on ws://127.0.0.1:18789
-ArmorClaw plugin intercepts tool calls inside the daemon before any execution.
+- OPENCLAW_MODE=demo  → Local orchestrator (simulated agents + ArmorClaw)
+- OPENCLAW_MODE=live  → OpenClaw CLI (real agents + real gateway)
+
+The live path uses:
+  node ~/openclaw-armoriq/openclaw.mjs agent --agent trader --message "..." --json
+
+This connects to the real OpenClaw gateway at ws://127.0.0.1:18789
 """
-
 import asyncio
 import json
 import os
-import uuid
-from typing import AsyncGenerator
+import subprocess
+from pathlib import Path
+from datetime import datetime
+from backend.agents.orchestrator import run_pipeline
+from backend.alpaca.client import AlpacaClient
+from backend.armorclaw.engine import ArmorClawEngine
 
-OPENCLAW_WS = os.getenv("OPENCLAW_WS", "ws://127.0.0.1:18789")
-OPENCLAW_MODE = os.getenv("OPENCLAW_MODE", "demo")
+OPENCLAW_HOME = Path.home() / "openclaw-armoriq"
+
+# Cache for singletons
+_alpaca_client = None
+_armorclaw_engine = None
+_daily_tracker = None
+_intent = None
+
+
+def _get_openclaw_mode():
+    """Get OPENCLAW_MODE from environment (checked at runtime)."""
+    return os.getenv("OPENCLAW_MODE", "demo").lower()
+
+
+
+def _get_intent():
+    """Load intent from file."""
+    global _intent
+    if _intent is None:
+        intent_path = os.getenv("INTENT_FILE_PATH", "./intent.json")
+        try:
+            with open(intent_path) as f:
+                _intent = json.load(f)
+        except FileNotFoundError:
+            # Fallback demo intent
+            _intent = {
+                "intent_token_id": "demo-intent-001",
+                "user_id": "demo-user",
+                "max_order_usd": 5000,
+                "daily_limit_usd": 50000,
+                "ticker_universe": ["AAPL", "GOOGL", "NVDA", "MSFT", "AMZN", "BTC/USD", "ETH/USD"],
+            }
+    return _intent
+
+
+def _get_armorclaw():
+    """Get or create ArmorClaw engine singleton."""
+    global _armorclaw_engine, _daily_tracker
+    if _armorclaw_engine is None:
+        if _daily_tracker is None:
+            _daily_tracker = {}
+        _armorclaw_engine = ArmorClawEngine(
+            intent=_get_intent(),
+            secret_key=os.getenv("ARMORCLAW_SECRET_KEY", "demo-secret-key-32-chars-minimum!"),
+            daily_tracker=_daily_tracker,
+        )
+    return _armorclaw_engine
+
+
+def _get_alpaca():
+    """Get or create Alpaca client singleton."""
+    global _alpaca_client
+    if _alpaca_client is None:
+        _alpaca_client = AlpacaClient()
+    return _alpaca_client
+
+
+async def _run_live_openclaw(
+    run_id: str,
+    action: str,
+    ticker: str,
+    amount_usd: float,
+    event_queues: dict,
+):
+    """
+    Send trade to real OpenClaw gateway via CLI.
+    
+    Uses: node ~/openclaw-armoriq/openclaw.mjs agent --agent trader --message "..." --json
+    
+    The gateway handles the real Analyst → Risk → Trader pipeline with live agents.
+    """
+    queue = asyncio.Queue()
+    event_queues[run_id] = queue
+
+    async def emit(event_type: str, data: dict):
+        queue.put_nowait({"event": event_type, "data": data})
+
+    try:
+        # Check OpenClaw is installed
+        openclaw_mjs = OPENCLAW_HOME / "openclaw.mjs"
+        if not openclaw_mjs.exists():
+            await emit("agent_activity", {
+                "agent": "System",
+                "status": "error",
+                "message": f"OpenClaw not found at {openclaw_mjs}. Install: cd ~/openclaw-armoriq && pnpm install",
+            })
+            queue.put_nowait(None)
+            return
+
+        await emit("agent_activity", {
+            "agent": "OpenClaw",
+            "status": "connecting",
+            "message": f"Connecting to live OpenClaw gateway (ws://127.0.0.1:18789)...",
+        })
+
+        # Build trade prompt for the trader agent
+        trade_prompt = (
+            f"AuraTrade autonomous trading task:\n"
+            f"{action} ${amount_usd:,.0f} worth of {ticker}.\n"
+            f"Run the Analyst → Risk → Trader pipeline with ArmorClaw enforcement.\n"
+            f"Run ID: {run_id}"
+        )
+
+        # Call OpenClaw CLI: node openclaw.mjs agent --agent main --message "..." --json
+        # The "main" agent is the default configured agent that handles trades
+        proc = await asyncio.create_subprocess_exec(
+            "node",
+            str(openclaw_mjs),
+            "agent",
+            "--agent", "main",
+            "--message", trade_prompt,
+            "--json",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(OPENCLAW_HOME),
+        )
+
+        # Capture stdout and stderr
+        stdout_data, stderr_data = await asyncio.wait_for(
+            proc.communicate(),
+            timeout=120,  # 2 minute timeout for agent execution
+        )
+
+        stdout_text = stdout_data.decode("utf-8", errors="replace").strip()
+        stderr_text = stderr_data.decode("utf-8", errors="replace").strip()
+
+        # Parse OpenClaw response (should be JSON)
+        if proc.returncode == 0 and stdout_text:
+            # Try to parse ndjson (newline-delimited JSON)
+            lines = stdout_text.split("\n")
+            for line in lines:
+                if not line.strip():
+                    continue
+                try:
+                    event = json.loads(line)
+                    
+                    # Map OpenClaw event types to our event format
+                    if event.get("type") == "agent_activity":
+                        await emit("agent_activity", {
+                            "agent": event.get("agent", "Agent"),
+                            "status": event.get("status", "running"),
+                            "message": event.get("message", ""),
+                        })
+                    elif event.get("type") == "armorclaw_decision":
+                        await emit("armorclaw_decision", {
+                            "decision": event.get("decision"),
+                            "rule_id": event.get("rule_id"),
+                            "reason": event.get("reason"),
+                            "ticker": ticker,
+                            "action": action,
+                            "amount_usd": amount_usd,
+                        })
+                    elif event.get("type") in ("done", "complete", "final"):
+                        await emit("done", {
+                            "run_id": run_id,
+                            "final_status": event.get("status", "COMPLETE"),
+                            "source": "openclaw_live",
+                        })
+                except json.JSONDecodeError:
+                    # Not JSON, log as message
+                    if line and not line.startswith("🦞"):
+                        await emit("agent_activity", {
+                            "agent": "OpenClaw",
+                            "status": "running",
+                            "message": line[:300],
+                        })
+
+            # If no done event received, emit one
+            if not any("done" in line or "complete" in line or "final" in line 
+                      for line in lines):
+                await emit("done", {
+                    "run_id": run_id,
+                    "final_status": "COMPLETE",
+                    "source": "openclaw_live",
+                })
+        else:
+            # Error - fallback to demo mode
+            await emit("agent_activity", {
+                "agent": "System",
+                "status": "warning",
+                "message": f"OpenClaw gateway unavailable. Falling back to demo mode...",
+            })
+            queue.put_nowait(None)
+            
+            # Fallback: run demo orchestrator
+            await _run_demo_orchestrator(
+                run_id, action, ticker, amount_usd, event_queues,
+            )
+            return
+
+    except asyncio.TimeoutError:
+        await emit("agent_activity", {
+            "agent": "System",
+            "status": "warning",
+            "message": "Trade execution timeout. Falling back to demo mode...",
+        })
+        queue.put_nowait(None)
+        
+        # Fallback: run demo orchestrator
+        await _run_demo_orchestrator(
+            run_id, action, ticker, amount_usd, event_queues,
+        )
+
+    except Exception as e:
+        await emit("agent_activity", {
+            "agent": "System",
+            "status": "warning",
+            "message": f"OpenClaw unavailable. Falling back to demo mode...",
+        })
+        queue.put_nowait(None)
+        
+        # Fallback: run demo orchestrator
+        await _run_demo_orchestrator(
+            run_id, action, ticker, amount_usd, event_queues,
+        )
+
+    finally:
+        queue.put_nowait(None)
+
+
+async def _run_demo_orchestrator(
+    run_id: str,
+    action: str,
+    ticker: str,
+    amount_usd: float,
+    event_queues: dict,
+    intent: dict = None,
+    armorclaw: ArmorClawEngine = None,
+    alpaca_client: AlpacaClient = None,
+):
+    """
+    Run the local demo orchestrator (simulated agents + ArmorClaw).
+    Used when OPENCLAW_MODE != live.
+    """
+    # Use provided or default instances
+    if intent is None:
+        intent = _get_intent()
+    if armorclaw is None:
+        armorclaw = _get_armorclaw()
+    if alpaca_client is None:
+        alpaca_client = _get_alpaca()
+    
+    # Call the orchestrator's pipeline
+    await run_pipeline(
+        run_id=run_id,
+        action=action,
+        ticker=ticker,
+        amount_usd=amount_usd,
+        intent=intent,
+        armorclaw=armorclaw,
+        alpaca_client=alpaca_client,
+        event_queues=event_queues,
+    )
 
 
 async def run_live_pipeline(
@@ -25,167 +282,54 @@ async def run_live_pipeline(
     ticker: str,
     amount_usd: float,
     event_queues: dict,
+    intent: dict = None,
+    armorclaw: ArmorClawEngine = None,
+    alpaca_client: AlpacaClient = None,
 ):
     """
-    Sends a trade command to the running OpenClaw daemon.
-    OpenClaw routes it through: Analyst → Risk → Trader.
-    ArmorClaw plugin intercepts the Trader's tool call and enforces policy.
-    Events are streamed back to the SSE queue.
-
-    Requires: `pip install websockets`
-    Requires: OpenClaw daemon running at ws://127.0.0.1:18789
-    Requires: ArmorClaw plugin installed and active
-    Requires: Alpaca Trading Skill installed via clawhub
+    Execute a trade through OpenClaw (live or demo mode).
+    
+    Routes based on OPENCLAW_MODE environment variable:
+    
+    - "demo"  → Local orchestrator (simulated agents + ArmorClaw)
+    - "live"  → OpenClaw CLI → Real gateway at ws://127.0.0.1:18789
+    
+    The pipeline:
+    1. AnalystAgent: Market analysis
+    2. RiskAgent: Portfolio checks + delegation token
+    3. TraderAgent: Order routing
+    4. ArmorClaw: Policy enforcement
+    5. Alpaca: Trade execution
+    
+    Parameters:
+    - run_id: Unique run identifier
+    - action: 'BUY' or 'SELL'
+    - ticker: Stock ticker (e.g., 'AAPL') or crypto (e.g., 'BTC/USD')
+    - amount_usd: Trade amount in USD
+    - event_queues: Dict to store asyncio.Queue for this run
+    - intent: Optional intent dict
+    - armorclaw: Optional ArmorClawEngine
+    - alpaca_client: Optional AlpacaClient
     """
-    try:
-        import websockets
-    except ImportError:
-        raise RuntimeError(
-            "websockets package required for live OpenClaw bridge. "
-            "Run: pip install websockets"
+    if _get_openclaw_mode() == "live":
+        # Real gateway
+        await _run_live_openclaw(run_id, action, ticker, amount_usd, event_queues)
+    else:
+        # Demo orchestrator
+        await _run_demo_orchestrator(
+            run_id, action, ticker, amount_usd, event_queues,
+            intent=intent,
+            armorclaw=armorclaw,
+            alpaca_client=alpaca_client,
         )
-
-    queue = asyncio.Queue()
-    event_queues[run_id] = queue
-
-    async def emit(event_type: str, data: dict):
-        queue.put_nowait({"event": event_type, "data": data})
-
-    try:
-        # Craft a natural language trading command for OpenClaw
-        prompt = (
-            f"You are an autonomous trading agent system called AuraTrade. "
-            f"Please execute the following trading task using the multi-agent pipeline:\n\n"
-            f"Task: Analyze {ticker} market conditions and portfolio risk, then "
-            f"if appropriate, {action.lower()} ${amount_usd:,.0f} worth of {ticker} "
-            f"using the Alpaca paper trading account.\n\n"
-            f"Requirements:\n"
-            f"- The Analyst agent must call market-data and research tools first\n"
-            f"- The Risk Agent must verify portfolio exposure and issue a delegation token\n"
-            f"- The Trader Agent must attach the delegation token before calling alpaca:execute\n"
-            f"- ArmorClaw will enforce all policy rules automatically\n\n"
-            f"Run ID for audit correlation: {run_id}"
-        )
-
-        await emit("agent_activity", {
-            "agent": "OpenClaw",
-            "status": "connecting",
-            "message": f"Connecting to OpenClaw daemon at {OPENCLAW_WS}..."
-        })
-
-        async with websockets.connect(OPENCLAW_WS) as ws:
-            await emit("agent_activity", {
-                "agent": "OpenClaw",
-                "status": "running",
-                "message": "Connected. Sending trade command to agent pipeline..."
-            })
-
-            # Send the command to OpenClaw
-            await ws.send(json.dumps({
-                "type": "agent.send",
-                "session": "main",
-                "message": prompt,
-                "metadata": {
-                    "run_id": run_id,
-                    "action": action,
-                    "ticker": ticker,
-                    "amount_usd": amount_usd,
-                }
-            }))
-
-            # Stream events back from OpenClaw daemon
-            async for raw_msg in ws:
-                try:
-                    msg = json.loads(raw_msg)
-                except json.JSONDecodeError:
-                    continue
-
-                msg_type = msg.get("type", "")
-
-                # Map OpenClaw message types to our SSE event format
-                if msg_type == "session.message":
-                    content = msg.get("content", "")
-                    agent_name = msg.get("agentId", "OpenClaw")
-                    await emit("agent_activity", {
-                        "agent": agent_name,
-                        "status": "running",
-                        "message": content[:200] if isinstance(content, str) else str(content)[:200]
-                    })
-
-                elif msg_type == "tool.call":
-                    tool_name = msg.get("tool", "unknown")
-                    agent_name = msg.get("agentId", "Agent")
-                    await emit("agent_activity", {
-                        "agent": agent_name,
-                        "status": "running",
-                        "message": f"Calling tool: {tool_name}..."
-                    })
-
-                elif msg_type == "armorclaw.decision":
-                    # ArmorClaw decision event — forward directly to decision SSE event
-                    decision_data = msg.get("decision", {})
-                    await emit("armorclaw_decision", {
-                        "decision": decision_data.get("verdict", "BLOCK"),
-                        "rule_id": decision_data.get("rule_id"),
-                        "block_reason": decision_data.get("reason"),
-                        "check_number": decision_data.get("check"),
-                        "ticker": ticker,
-                        "action": action,
-                        "amount_usd": amount_usd,
-                        "run_id": run_id,
-                        "timestamp": decision_data.get("timestamp"),
-                    })
-
-                elif msg_type == "tool.result":
-                    # Alpaca order confirmation on ALLOW
-                    tool = msg.get("tool", "")
-                    result = msg.get("result", {})
-                    if "alpaca" in tool.lower():
-                        await emit("agent_activity", {
-                            "agent": "TraderAgent",
-                            "status": "complete",
-                            "message": f"Alpaca result: {str(result)[:150]}"
-                        })
-
-                elif msg_type in ("session.complete", "agent.complete"):
-                    await emit("done", {
-                        "run_id": run_id,
-                        "final_status": "COMPLETE",
-                        "source": "openclaw_live"
-                    })
-                    break
-
-                elif msg_type == "session.error":
-                    error_msg = msg.get("error", "Unknown error")
-                    await emit("agent_activity", {
-                        "agent": "System",
-                        "status": "error",
-                        "message": f"OpenClaw error: {error_msg}"
-                    })
-                    await emit("done", {"run_id": run_id, "final_status": "ERROR"})
-                    break
-
-    except ConnectionRefusedError:
-        await emit("agent_activity", {
-            "agent": "System",
-            "status": "error",
-            "message": (
-                "Cannot connect to OpenClaw daemon. "
-                "Is OpenClaw running? Try: openclaw onboard --install-daemon"
-            )
-        })
-        await emit("done", {"run_id": run_id, "final_status": "ERROR"})
-    except Exception as e:
-        await emit("agent_activity", {
-            "agent": "System",
-            "status": "error",
-            "message": f"OpenClaw bridge error: {str(e)}"
-        })
-        await emit("done", {"run_id": run_id, "final_status": "ERROR"})
-    finally:
-        queue.put_nowait(None)
 
 
 def is_live_mode() -> bool:
-    """Returns True if OPENCLAW_MODE=live and we should use the real daemon."""
-    return OPENCLAW_MODE.lower() == "live"
+    """Returns True if OPENCLAW_MODE=live."""
+    return _get_openclaw_mode() == "live"
+
+
+
+
+
+

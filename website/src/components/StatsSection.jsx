@@ -87,7 +87,7 @@ export default function StatsSection() {
       </div>
       <div style={{ marginTop: '4rem', padding: '1.5rem', background: 'rgba(0, 245, 255, 0.03)', borderTop: '1px solid rgba(0, 245, 255, 0.1)', borderBottom: '1px solid rgba(0, 245, 255, 0.1)', maxWidth: '860px', margin: '4rem auto 0' }}>
         <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', color: 'var(--cyan)', letterSpacing: '0.02em', lineHeight: 1.6 }}>
-          "ArmorClaw sits between every agent and Alpaca.
+          "ArmorClaw" enforces 14 distinct policy rules across 5 layers of checks, ensuring that no order can be placed without explicit authorization, cannot exceed predefined limits, and cannot be executed outside of allowed hours.
           <br /><span style={{ color: 'var(--text-muted)' }}>Even a hallucinating LLM cannot place an oversized, unauthorized, or off-hours order."</span>
         </p>
       </div>

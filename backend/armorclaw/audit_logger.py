@@ -64,3 +64,16 @@ def write_audit(
         return entry
     finally:
         db.close()
+
+
+def update_alpaca_order_id(entry_id: int, alpaca_order_id: str) -> None:
+    """Patch a previously written ALLOW entry with the real Alpaca order ID."""
+    db = SessionLocal()
+    try:
+        entry = db.query(AuditLog).filter(AuditLog.id == entry_id).first()
+        if entry:
+            entry.alpaca_order_id = alpaca_order_id
+            db.commit()
+    finally:
+        db.close()
+
