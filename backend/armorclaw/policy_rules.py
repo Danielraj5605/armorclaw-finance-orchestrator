@@ -26,7 +26,13 @@ def portfolio_concentration_limit(ticker: str, amount_usd: float, portfolio_valu
 
 
 def sector_exposure_limit(ticker: str, amount_usd: float, portfolio_value: float):
-    tech_tickers = {"NVDA", "AAPL", "GOOGL", "MSFT"}
+    tech_tickers = {"NVDA", "AAPL", "GOOGL", "MSFT", "AMZN", "META", "TSLA"}
+    crypto_tickers = {"BTC/USD", "ETH/USD"}
+    if ticker in crypto_tickers:
+        # Crypto: 20% max concentration
+        if portfolio_value > 0 and (amount_usd / portfolio_value) * 100 > 20:
+            return False, f"Crypto position would exceed 20% portfolio concentration"
+        return True, "OK"
     if ticker not in tech_tickers:
         return True, "OK"
     if portfolio_value <= 0:

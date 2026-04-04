@@ -18,73 +18,160 @@ const head  = { fontFamily: "'Orbitron', monospace" }
 const label = { fontFamily: "'JetBrains Mono', monospace", fontSize: '0.65rem', color: '#00f5ff', letterSpacing: '0.25em', textTransform: 'uppercase', marginBottom: '0.85rem', display: 'block' }
 
 // ─── Panel 1: Trade Trigger ────────────────────────────────────
-function TradeTrigger({ onRunStart, running }) {
-  const [error, setError] = useState(null)
+const ALLOWED_TICKERS = ['NVDA','AAPL','MSFT','GOOGL','AMZN','META','TSLA','BTC/USD','ETH/USD']
 
-  async function triggerTrade(amountUsd) {
+function parsePrompt(text) {
+  const s = text.trim().toUpperCase()
+  const actionMatch = s.match(/\b(BUY|SELL)\b/)
+  if (!actionMatch) return null
+  let ticker = null
+  for (const t of ALLOWED_TICKERS) {
+    if (s.includes(t)) { ticker = t; break }
+  }
+  if (!ticker) {
+    const afterAction = s.slice(s.indexOf(actionMatch[1]) + actionMatch[1].length).trim()
+    ticker = afterAction.split(/[\s$/,]+/)[0]
+  }
+  const amtMatch = s.match(/\$?\s*(\d[\d,]*(?:\.\d+)?)/)
+  if (!amtMatch) return null
+  const amount = parseFloat(amtMatch[1].replace(/,/g, ''))
+  if (!amount || amount <= 0) return null
+  return { action: actionMatch[1], ticker, amount_usd: amount }
+}
+
+function TradeTrigger({ onRunStart, running }) {
+  const [prompt, setPrompt] = useState('')
+  const [parsed, setParsed] = useState(null)
+  const [error,  setError]  = useState(null)
+
+  function handleChange(val) {
+    setPrompt(val)
     setError(null)
+    setParsed(parsePrompt(val))
+  }
+
+  async function triggerTrade(action, ticker, amount_usd) {
+    setError(null)
+    if (!action || !ticker || !amount_usd) return setError('Could not parse — try: "BUY NVDA $4000"')
     try {
       const res = await fetch(`${API}/run-trade`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'BUY', ticker: 'NVDA', amount_usd: amountUsd }),
+        body: JSON.stringify({ action, ticker: ticker.trim().toUpperCase(), amount_usd }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      onRunStart(data.run_id, amountUsd)
+      onRunStart(data.run_id)
+      setPrompt(''); setParsed(null)
     } catch (e) {
       setError(`Backend not reachable: ${e.message}. Start FastAPI on port 8000.`)
     }
   }
 
+  function onSubmit() {
+    if (!parsed) return setError('Could not parse — try: "BUY NVDA $4000" or "SELL TSLA 3000"')
+    triggerTrade(parsed.action, parsed.ticker, parsed.amount_usd)
+  }
+
+  const isReady = !!parsed && !running
+
   return (
     <div style={{ ...card, marginBottom: '1.5rem' }}>
-      <span style={label}>Trade Trigger</span>
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        <button
-          disabled={running}
-          onClick={() => triggerTrade(4000)}
-          style={{
-            flex: 1, minWidth: '200px', padding: '1.1rem 2rem',
-            background: running ? 'rgba(0,255,136,0.05)' : 'rgba(0,255,136,0.12)',
-            border: '1px solid rgba(0,255,136,0.5)',
-            color: running ? 'rgba(0,255,136,0.4)' : '#00ff88',
-            borderRadius: '10px', cursor: running ? 'not-allowed' : 'pointer',
-            ...head, fontSize: '0.78rem', letterSpacing: '0.06em',
-            transition: 'all 0.2s', boxShadow: running ? 'none' : '0 0 20px rgba(0,255,136,0.2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem',
-          }}
-          onMouseEnter={e => { if (!running) { e.currentTarget.style.boxShadow = '0 0 40px rgba(0,255,136,0.4)'; e.currentTarget.style.transform = 'translateY(-2px)' } }}
-          onMouseLeave={e => { e.currentTarget.style.boxShadow = running ? 'none' : '0 0 20px rgba(0,255,136,0.2)'; e.currentTarget.style.transform = 'translateY(0)' }}>
-          {running ? <Spinner color="#00ff88" /> : '✅'}
-          Run Allowed Trade — BUY NVDA $4,000
-        </button>
+      <span style={label}>Trade Command</span>
 
-        <button
-          disabled={running}
-          onClick={() => triggerTrade(8000)}
-          style={{
-            flex: 1, minWidth: '200px', padding: '1.1rem 2rem',
-            background: running ? 'rgba(255,80,80,0.03)' : 'rgba(255,80,80,0.08)',
-            border: '1px solid rgba(255,80,80,0.45)',
-            color: running ? 'rgba(255,80,80,0.4)' : '#ff5555',
-            borderRadius: '10px', cursor: running ? 'not-allowed' : 'pointer',
-            ...head, fontSize: '0.78rem', letterSpacing: '0.06em',
-            transition: 'all 0.2s', boxShadow: running ? 'none' : '0 0 20px rgba(255,80,80,0.15)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem',
-          }}
-          onMouseEnter={e => { if (!running) { e.currentTarget.style.boxShadow = '0 0 40px rgba(255,80,80,0.35)'; e.currentTarget.style.transform = 'translateY(-2px)' } }}
-          onMouseLeave={e => { e.currentTarget.style.boxShadow = running ? 'none' : '0 0 20px rgba(255,80,80,0.15)'; e.currentTarget.style.transform = 'translateY(0)' }}>
-          {running ? <Spinner color="#ff5555" /> : '🚫'}
-          Trigger Blocked Trade — BUY NVDA $8,000
-        </button>
+      {/* ── Natural language prompt bar ── */}
+      <div style={{ marginBottom: '1.2rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'stretch' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <input
+              value={prompt}
+              onChange={e => handleChange(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && isReady && onSubmit()}
+              placeholder='Type a trade — e.g. "BUY NVDA $4000"  or  "SELL TSLA 3000"  or  "BUY BTC/USD 1500"'
+              disabled={running}
+              style={{
+                width: '100%', padding: '0.95rem 1rem 0.95rem 2.8rem',
+                borderRadius: '10px', boxSizing: 'border-box',
+                background: 'rgba(0,245,255,0.05)',
+                border: `1px solid ${parsed ? 'rgba(0,245,255,0.65)' : 'rgba(0,245,255,0.25)'}`,
+                color: '#f0f0f8', ...mono, fontSize: '0.9rem', outline: 'none',
+                boxShadow: parsed ? '0 0 18px rgba(0,245,255,0.12)' : 'none',
+                transition: 'all 0.2s',
+              }}
+            />
+            <span style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', opacity: 0.45 }}>⌨</span>
+          </div>
+          <button
+            disabled={!isReady}
+            onClick={onSubmit}
+            style={{
+              padding: '0.95rem 1.6rem', borderRadius: '10px',
+              background: isReady ? 'rgba(0,245,255,0.15)' : 'rgba(0,245,255,0.04)',
+              border: `1px solid ${isReady ? 'rgba(0,245,255,0.6)' : 'rgba(0,245,255,0.15)'}`,
+              color: isReady ? 'var(--cyan)' : 'rgba(0,245,255,0.3)',
+              ...head, fontSize: '0.75rem', letterSpacing: '0.06em',
+              cursor: isReady ? 'pointer' : 'not-allowed', transition: 'all 0.2s',
+              display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap',
+              boxShadow: isReady ? '0 0 20px rgba(0,245,255,0.2)' : 'none',
+            }}>
+            {running ? <Spinner color="var(--cyan)" size={14} /> : '▶ Execute'}
+          </button>
+        </div>
+
+        {/* Live parse preview */}
+        {parsed && (
+          <div style={{ marginTop: '0.55rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ ...mono, fontSize: '0.6rem', color: '#607080' }}>Parsed →</span>
+            <Tag color={parsed.action === 'BUY' ? '#00ff88' : '#ff5555'}>{parsed.action}</Tag>
+            <Tag color="var(--cyan)">{parsed.ticker}</Tag>
+            <Tag color="#fbbf24">${parsed.amount_usd?.toLocaleString()}</Tag>
+            <span style={{ ...mono, fontSize: '0.58rem', color: '#354555' }}>← press Enter or Execute</span>
+          </div>
+        )}
+
+        <div style={{ marginTop: '0.55rem', ...mono, fontSize: '0.58rem', color: '#354555' }}>
+          Authorized: {ALLOWED_TICKERS.join(' · ')}
+        </div>
       </div>
+
+      {/* ── Quick presets ── */}
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        {[
+          { label: '✅ BUY NVDA $4K',      action:'BUY', ticker:'NVDA',    amt:4000, c:'#00ff88' },
+          { label: '🚫 BUY NVDA $8K',      action:'BUY', ticker:'NVDA',    amt:8000, c:'#ff5555' },
+          { label: '₿  BUY BTC/USD $1.5K', action:'BUY', ticker:'BTC/USD', amt:1500, c:'#fbbf24' },
+          { label: '📈 BUY TSLA $2K',      action:'BUY', ticker:'TSLA',    amt:2000, c:'#a78bfa' },
+        ].map(({ label: lbl, action, ticker, amt, c }) => (
+          <button key={lbl} disabled={running} onClick={() => triggerTrade(action, ticker, amt)}
+            style={{
+              flex: '1 1 160px', padding: '0.8rem 1rem',
+              background: running ? `${c}08` : `${c}12`,
+              border: `1px solid ${c}66`, color: running ? `${c}44` : c,
+              borderRadius: '9px', cursor: running ? 'not-allowed' : 'pointer',
+              ...head, fontSize: '0.68rem', letterSpacing: '0.04em', transition: 'all 0.2s',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+            }}
+            onMouseEnter={e => { if (!running) e.currentTarget.style.boxShadow = `0 0 25px ${c}30` }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none' }}>
+            {running ? <Spinner color={c} size={12} /> : lbl}
+          </button>
+        ))}
+      </div>
+
       {error && (
         <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: 'rgba(255,80,80,0.08)', border: '1px solid rgba(255,80,80,0.3)', borderRadius: '8px', ...mono, fontSize: '0.75rem', color: '#ff8888' }}>
           ⚠ {error}
         </div>
       )}
     </div>
+  )
+}
+
+function Tag({ color, children }) {
+  return (
+    <span style={{ ...mono, fontSize: '0.68rem', padding: '0.18rem 0.55rem', borderRadius: '4px', background: `${color}18`, color, border: `1px solid ${color}44` }}>
+      {children}
+    </span>
   )
 }
 
