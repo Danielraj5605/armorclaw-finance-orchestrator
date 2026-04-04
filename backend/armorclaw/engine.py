@@ -147,7 +147,7 @@ class ArmorClawEngine:
         # ── CHECK 4: Regulatory & Temporal ─────────────────────────
         fail_rules, fail_reasons = [], []
 
-        ok, reason = rules.market_hours_only()
+        ok, reason = rules.market_hours_only(ticker)
         if not ok:
             fail_rules.append("market-hours-only"); fail_reasons.append(reason)
 

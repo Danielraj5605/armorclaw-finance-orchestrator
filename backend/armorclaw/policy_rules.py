@@ -50,13 +50,16 @@ def ticker_universe_restriction(ticker: str, intent: dict):
     return True, "OK"
 
 
-def market_hours_only():
-    """NYSE: 09:30–16:00 ET, Mon–Fri"""
+CRYPTO_TICKERS = {"BTC/USD", "ETH/USD"}
+
+def market_hours_only(ticker: str = ""):
+    """NYSE: 09:30–16:00 ET, Mon–Fri. Crypto is 24/7 — always passes."""
+    if ticker in CRYPTO_TICKERS:
+        return True, "OK (crypto trades 24/7)"
     try:
         import zoneinfo
         et = zoneinfo.ZoneInfo("America/New_York")
     except Exception:
-        # Fall back — always pass if timezone unavailable
         return True, "OK (timezone unavailable)"
     now_et = datetime.now(et)
     if now_et.weekday() >= 5:

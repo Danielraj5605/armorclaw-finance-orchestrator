@@ -67,18 +67,25 @@ class AlpacaClient:
 
     def place_order(self, action: str, ticker: str, amount_usd: float) -> str:
         """Places a notional market order and returns Alpaca order_id."""
+        is_crypto = "/" in ticker  # BTC/USD, ETH/USD etc.
+        tif = "gtc" if is_crypto else "day"
         try:
+            if not self.api_key or not self.secret_key:
+                raise ValueError("Alpaca API keys not configured in .env")
             result = self._post("/v2/orders", {
-                "symbol":       ticker,
-                "notional":     str(amount_usd),
-                "side":         action.lower(),
-                "type":         "market",
-                "time_in_force": "day",
+                "symbol":        ticker,
+                "notional":      str(amount_usd),
+                "side":          action.lower(),
+                "type":          "market",
+                "time_in_force": tif,
             })
             # Invalidate caches so next read reflects new position
             self._positions_cache = None
             self._account_cache   = None
-            return result.get("id", f"alp-{ticker}-demo")
+            order_id = result.get("id", "")
+            print(f"✅ Alpaca order placed: {action} {ticker} ${amount_usd} → order_id={order_id}")
+            return order_id
         except Exception as e:
-            # Fallback for demo when Alpaca keys not configured
+            print(f"⚠️  Alpaca order FAILED: {e}")
             return f"sim-order-{ticker}-{int(time.time())}"
+
