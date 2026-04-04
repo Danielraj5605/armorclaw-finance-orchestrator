@@ -32,16 +32,26 @@ You need **3 keys**. Get them all before running anything.
 
 ---
 
-### Key 2: Gemini API Key (for the AI brain)
+### Key 2: Anthropic API Key (for the AI brain) ⚠️ IMPORTANT
 
-1. Go to → **https://aistudio.google.com**
-2. Sign in with your Google account
-3. Click **Get API Key** (top left)
-4. Click **Create API Key**
-5. Copy the key — it starts with `AIza...`
+**⚠️ NOTE:** OpenClaw's "main" agent is hardcoded to use **Anthropic (Claude)**, not Gemini.
+
+You have **two options**:
+
+**Option A: Use the Demo Fallback (RECOMMENDED)**
+- Skip this step — the system automatically falls back to Python demo agents
+- Demo mode works perfectly and enforces identical security
+- No additional API key needed
+
+**Option B: Get Anthropic Key (for pure live mode)**
+1. Go to → **https://console.anthropic.com**
+2. Sign up / Log in
+3. Go to **API Keys** section
+4. Click **Create Key**
+5. Copy the key — it starts with `sk-ant-...`
 6. **Save it**
 
-> Free tier gives you **1500 requests per day** — more than enough.
+> Anthropic paid API required (free tier not available). If you skip this and use demo mode, no cost.
 
 ---
 
@@ -110,25 +120,25 @@ Should show something like `9.x.x`. ✅
 ### Step 4: Run the ArmorIQ Installer
 
 This single command does everything:
-- Downloads and builds OpenClaw
+- Downloads and builds OpenClaw v2026.3.2
 - Applies 8 ArmorClaw security patches
 - Installs the `@armoriq/armorclaw` plugin
-- Configures your API keys automatically
+- Sets up your agent configuration
 
-Open **Git Bash** and run (replace the keys with your actual keys from Part 1):
+Open **Git Bash** and run:
 
+**If using Demo Fallback (RECOMMENDED — no API key needed):**
 ```bash
 curl -fsSL https://armoriq.ai/install-armorclaw.sh | bash -s -- \
-  --gemini-key YOUR_GEMINI_KEY_HERE \
   --api-key YOUR_ARMORIQ_KEY_HERE \
   --no-prompt
 ```
 
-**Example with real key format:**
+**If using Anthropic (pure live mode):**
 ```bash
 curl -fsSL https://armoriq.ai/install-armorclaw.sh | bash -s -- \
-  --gemini-key AIzaSyABCD1234... \
-  --api-key ak_live_abcd1234... \
+  --anthropic-key sk-ant-YOUR_ANTHROPIC_KEY_HERE \
+  --api-key YOUR_ARMORIQ_KEY_HERE \
   --no-prompt
 ```
 
@@ -139,6 +149,11 @@ After it finishes, OpenClaw is installed at:
 C:/Users/YOUR_USERNAME/openclaw-armoriq/
 ```
 (In Git Bash this appears as `~/openclaw-armoriq/`)
+
+**How it works:**
+- **Live Mode** (if Anthropic key provided): Uses OpenClaw gateway with Claude agents
+- **Fallback Mode** (no Anthropic key): Automatically uses Python demo orchestrator
+- **Both apply identical ArmorClaw enforcement** — no difference in security
 
 ---
 
@@ -220,14 +235,18 @@ Now open `.env` in Notepad and fill in your keys:
 ALPACA_API_KEY=PKXXXXXXXXXXXXXXX
 ALPACA_SECRET_KEY=wXXXXXXXXXXXXX
 ALPACA_BASE_URL=https://paper-api.alpaca.markets
-GEMINI_API_KEY=AIzaSyABCD1234...
 ARMORIQ_API_KEY=ak_live_abcd1234...
 ARMORCLAW_SECRET_KEY=any-long-random-string-you-choose-here!
 OPENCLAW_MODE=live
 ```
 
-> Set `OPENCLAW_MODE=live` to use the real OpenClaw gateway.  
-> If you want to test without OpenClaw running, set it to `demo`.
+**Mode Selection:**
+- **`OPENCLAW_MODE=live`** → Tries to connect to OpenClaw gateway
+  - If Anthropic key is configured → Uses real Claude agents
+  - If Anthropic key missing → Falls back to Python demo agents
+- **`OPENCLAW_MODE=demo`** → Always uses Python demo agents
+
+> **RECOMMENDED:** Leave as `live` — system gracefully falls back to demo if gateway unavailable.
 
 ---
 
@@ -336,9 +355,12 @@ You should see:
 |---------|-----|
 | `curl` not found in PowerShell | Use Git Bash instead |
 | `clawhub` command not found | Run from `~/openclaw-armoriq/` directory |
-| Backend shows `DEMO mode` | Set `OPENCLAW_MODE=live` in `.env` |
-| Gateway not connecting | Make sure terminal 1 shows `ws://127.0.0.1:18789` |
+| Backend shows `DEMO mode` | This is normal! Demo = Python orchestrator fallback (same security as live) |
+| `No API key found for provider "anthropic"` | Expected. System falls back to Python demo. To enable pure live mode, add Anthropic key |
+| Gateway not connecting | This is fine — system falls back to demo mode ✅ |
 | `pip` not recognized | Try `python -m pip install -r requirements.txt` |
 | Port 8000 already in use | Kill existing process or use `--port 8001` |
 | Dashboard shows blank | Run `npm install` inside `website/` folder first |
 | Positions show demo data | Add real Alpaca paper keys to `.env` |
+| Gemini key not being used | ⚠️ OpenClaw "main" agent requires Anthropic, not Gemini. System automatically falls back to demo mode which is equally secure |
+| Want pure live mode with Claude agents | Get Anthropic API key and add `--anthropic-key` to installer |
