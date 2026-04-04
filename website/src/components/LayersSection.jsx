@@ -6,8 +6,8 @@ const LAYERS = [
     num: '01', icon: '📄', accent: 'var(--cyan)',
     title: 'Intent Declaration',
     sub: 'Layer 1 — Immutable Policy Root',
-    desc: 'intent.json declares the mission at boot. Authorized tickers [NVDA, AAPL, GOOGL, MSFT], $5,000 max order, $20,000 daily cap. Cryptographically hashed. Never mutated at runtime.',
-    tags: ['intent.json', 'SHA-256 hash', 'Pydantic schema', 'Boot-time load'],
+    desc: 'intent.json declares the mission at boot. Authorized tickers: NVDA, AAPL, GOOGL, MSFT, AMZN, META, TSLA, BTC/USD, ETH/USD. $5,000 max order cap, $20,000 daily cap. Schema-validated on startup. Never mutated at runtime.',
+    tags: ['intent.json', 'Pydantic v2 schema', 'Boot-time load', '9 authorized tickers'],
   },
   {
     num: '02', icon: '🤖', accent: 'var(--cyan)',
@@ -20,15 +20,15 @@ const LAYERS = [
     num: '03', icon: '⚙️', accent: '#b89cff',
     title: 'ArmorClaw Engine',
     sub: 'Layer 3 — Deterministic Enforcement',
-    desc: '5 sequential checks. 14 named policy rules. Every order that passes all 5 checks reaches Alpaca. Every failure is logged to a tamper-evident SHA-256 chained audit trail.',
-    tags: ['5 checks', '14 rules', 'Audit log', 'Proof hash'],
+    desc: '5 sequential checks. 14 named policy rules. Each check gates the next — a single failure stops the pipeline immediately. Every decision (ALLOW or BLOCK) is written to a SHA-256 proof-hash-chained SQLite audit log.',
+    tags: ['5 checks', '14 rules', 'Early-exit enforcement', 'SHA-256 audit chain'],
   },
   {
     num: '04', icon: '📈', accent: 'var(--cyan)',
     title: 'Alpaca Paper Trading',
     sub: 'Layer 4 — Execution Boundary',
-    desc: 'Only receives ArmorClaw-approved requests. Paper trading only — no real money. Provides account equity, positions, and order confirmation back up the chain.',
-    tags: ['Paper trading', 'REST API', 'No real money', 'Positions feed'],
+    desc: 'Only receives ArmorClaw-approved requests via httpx REST calls. Paper trading only — no real money at risk. Provides account equity, live positions, and order confirmation back up the chain via the Alpaca Paper Trading API.',
+    tags: ['Paper trading', 'httpx REST', 'No real money', 'Order confirmation'],
   },
 ]
 
